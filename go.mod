@@ -1,1 +1,1 @@
-module golang_reverse_proxy
+module srp
