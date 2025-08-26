@@ -90,33 +90,34 @@ func (p *Proto) EncodeProto() ([]byte, error) {
 
 func (p *Proto) DecodeProto(reader *bufio.Reader) error {
 	codeBytes := make([]byte, 2)
+
 	if _, err := io.ReadFull(reader, codeBytes); err != nil {
-		return fmt.Errorf("编码Code失败: %w", err)
+		return fmt.Errorf("解码Code失败: %w", err)
 	}
 	p.Code = StatusCode(binary.BigEndian.Uint16(codeBytes))
 
 	typeBytes := make([]byte, 2)
 	if _, err := io.ReadFull(reader, typeBytes); err != nil {
-		return fmt.Errorf("编码Type失败: %w", err)
+		return fmt.Errorf("解码Type失败: %w", err)
 	}
 	p.Type = TypeCode(binary.BigEndian.Uint16(typeBytes))
 
 	uidBytes := make([]byte, 4)
 	if _, err := io.ReadFull(reader, uidBytes); err != nil {
-		return fmt.Errorf("编码UID失败: %w", err)
+		return fmt.Errorf("解码UID失败: %w", err)
 	}
 	p.UID = binary.BigEndian.Uint32(uidBytes)
 
 	lenBytes := make([]byte, 4)
 	if _, err := io.ReadFull(reader, lenBytes); err != nil {
-		return fmt.Errorf("编码PayloadLen失败: %w", err)
+		return fmt.Errorf("解码PayloadLen失败: %w", err)
 	}
 	p.PayloadLen = binary.BigEndian.Uint32(lenBytes)
 
 	if p.PayloadLen > 0 {
 		p.Payload = make([]byte, p.PayloadLen)
 		if _, err := io.ReadFull(reader, p.Payload); err != nil {
-			return fmt.Errorf("编码Payload失败: %w", err)
+			return fmt.Errorf("解码Payload失败: %w", err)
 		}
 	} else {
 		p.Payload = nil

@@ -94,6 +94,8 @@ func (s *Server) AcceptClient() {
 		if err != nil {
 			log.Println("拒绝srp-client：" + conn.RemoteAddr().String() + "的连接，" + err.Error())
 			continue
+		} else {
+			log.Println("开始处理srp-client：" + conn.RemoteAddr().String() + "的连接")
 		}
 		go s.HandleClient(conn)
 	}

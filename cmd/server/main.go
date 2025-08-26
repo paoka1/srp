@@ -19,7 +19,7 @@ func main() {
 	clientPort := flag.Int("client-port", 6000, "srp-client连接的端口")
 	userPort := flag.Int("user-port", 9000, "用户访问转发服务的端口")
 	serverPassword := flag.String("server-pwd", common.DefaultServerPasswd, "访问转发服务的密码")
-	isDebug := flag.Bool("isDebug", false, "开启调试模式")
+	isDebug := flag.Bool("debug", false, "开启调试模式")
 	flag.Parse()
 
 	srpServer := server.Server{
