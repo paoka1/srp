@@ -18,13 +18,13 @@ const (
 )
 
 const (
-	TypePing       TypeCode = 1 // srp-client 验证
-	TypePong       TypeCode = 2 // srp-server 响应
-	TypeNewUser    TypeCode = 3 // 新的 user 连接
-	TypeAcceptUser TypeCode = 4 // 同意 user 连接
-	TypeRejectUser TypeCode = 5 // 拒绝 user 连接
-	TypeForwarding TypeCode = 6 // 数据转发
-	TypeDisConn    TypeCode = 7 // 断开连接
+	TypePing          TypeCode = 1 // srp-client 验证
+	TypePong          TypeCode = 2 // srp-server 响应
+	TypeNewUser       TypeCode = 3 // 新的 user 连接
+	TypeAcceptUser    TypeCode = 4 // 同意 user 连接
+	TypeRejectUser    TypeCode = 5 // 拒绝 user 连接
+	TypeForwarding    TypeCode = 6 // 数据转发
+	TypeDisconnection TypeCode = 7 // 断开连接
 )
 
 var statusCodeMap = map[StatusCode]string{
@@ -33,12 +33,13 @@ var statusCodeMap = map[StatusCode]string{
 }
 
 var typeCodeMap = map[TypeCode]string{
-	TypePing:       "TypePing",
-	TypePong:       "TypePong",
-	TypeNewUser:    "TypeNewUser",
-	TypeAcceptUser: "TypeAcceptUser",
-	TypeRejectUser: "TypeRejectUser",
-	TypeForwarding: "TypeForwarding",
+	TypePing:          "TypePing",
+	TypePong:          "TypePong",
+	TypeNewUser:       "TypeNewUser",
+	TypeAcceptUser:    "TypeAcceptUser",
+	TypeRejectUser:    "TypeRejectUser",
+	TypeForwarding:    "TypeForwarding",
+	TypeDisconnection: "TypeDisconnection",
 }
 
 type Proto struct {
@@ -89,18 +90,18 @@ func (p *Proto) EncodeProto() ([]byte, error) {
 }
 
 func (p *Proto) DecodeProto(reader *bufio.Reader) error {
-	codeBytes := make([]byte, 2)
-
-	if _, err := io.ReadFull(reader, codeBytes); err != nil {
+	// code 和 type 都是 uint8，直接读取 byte 即可
+	codeByte, err := reader.ReadByte()
+	if err != nil {
 		return fmt.Errorf("解码Code失败: %w", err)
 	}
-	p.Code = StatusCode(binary.BigEndian.Uint16(codeBytes))
+	p.Code = StatusCode(codeByte)
 
-	typeBytes := make([]byte, 2)
-	if _, err := io.ReadFull(reader, typeBytes); err != nil {
+	typeByte, err := reader.ReadByte()
+	if err != nil {
 		return fmt.Errorf("解码Type失败: %w", err)
 	}
-	p.Type = TypeCode(binary.BigEndian.Uint16(typeBytes))
+	p.Type = TypeCode(typeByte)
 
 	uidBytes := make([]byte, 4)
 	if _, err := io.ReadFull(reader, uidBytes); err != nil {

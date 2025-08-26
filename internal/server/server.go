@@ -249,7 +249,7 @@ func (s *Server) HandleUserConn(conn net.Conn) {
 				log.Println("user：" + conn.RemoteAddr().String() + "断开连接")
 			}
 			if _, ok := s.UserUIDMap[data.UID]; ok {
-				data = common.NewProto(common.CodeSuccess, common.TypeDisConn, uid, []byte{})
+				data = common.NewProto(common.CodeSuccess, common.TypeDisconnection, uid, []byte{})
 				s.DataChan2Client <- data
 				s.RemoveUserConn(uid)
 			}

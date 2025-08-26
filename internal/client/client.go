@@ -135,7 +135,7 @@ func (n *Client) HandleNewUserConn(data common.Proto) {
 			} else {
 				log.Println(fmt.Sprintf("和uid(%d)的本地连接(%s)的连接断开，%s", uid, conn.LocalAddr().String(), err.Error()))
 			}
-			data = common.NewProto(common.CodeSuccess, common.TypeDisConn, uid, []byte{})
+			data = common.NewProto(common.CodeSuccess, common.TypeDisconnection, uid, []byte{})
 			if _, ok := n.UserUIDMap[data.UID]; ok {
 				dataByteEncoded, _ := data.EncodeProto()
 				n.ServerConn.Write(dataByteEncoded)

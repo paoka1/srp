@@ -71,7 +71,7 @@ func main() {
 				log.Println("转发数据到srp-server：")
 				log.Println(data.String())
 			}
-		case common.TypeDisConn:
+		case common.TypeDisconnection:
 			if conn, ok := srpClient.UserUIDMap[data.UID]; ok {
 				srpClient.RemoveUserConn(data.UID)
 				conn.Close()

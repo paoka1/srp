@@ -68,7 +68,7 @@ func main() {
 				log.Println(data.String())
 			}
 		case data := <-srpServer.DataChan2User:
-			if data.Type == common.TypeDisConn {
+			if data.Type == common.TypeDisconnection {
 				if conn, ok := srpServer.UserUIDMap[data.UID]; ok {
 					srpServer.RemoveUserConn(data.UID)
 					conn.Close()
