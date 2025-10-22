@@ -159,13 +159,12 @@ func (s *Server) HandleClient(conn net.Conn) {
 		if err = data.DecodeProto(reader); err != nil {
 			if errors.Is(err, io.EOF) {
 				log.Println("srp-client：" + conn.RemoteAddr().String() + "断开连接，" + err.Error())
-				s.CloseClientConn()
-				s.CloseAllUserConn()
-				return
 			} else {
 				log.Println("读取srp-client：" + conn.RemoteAddr().String() + "的数据失败，" + err.Error())
 			}
-			continue
+			s.CloseClientConn()
+			s.CloseAllUserConn()
+			return
 		}
 		if data.Type == common.TypeAcceptUser || data.Type == common.TypeRejectUser {
 			s.DataChan2Handle <- data
