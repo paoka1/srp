@@ -24,10 +24,10 @@ func main() {
 
 	srpServer := server.Server{
 		Config: server.Config{
-			*clientPort,
-			*userPort,
-			*serverPassword,
-			*isDebug,
+			ClientPort:     *clientPort,
+			UserPort:       *userPort,
+			ServerPassword: *serverPassword,
+			IsDebug:        *isDebug,
 		},
 		ClientConn:      nil,
 		UIDNext:         1,

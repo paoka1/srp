@@ -26,12 +26,12 @@ func main() {
 
 	srpClient := client.Client{
 		Config: client.Config{
-			*serverIP,
-			*serverPort,
-			*serviceIP,
-			*servicePort,
-			*serverPassword,
-			*isDebug,
+			ServerIP:       *serverIP,
+			ServerPort:     *serverPort,
+			ServiceIP:      *serviceIP,
+			ServicePort:    *servicePort,
+			ServerPassword: *serverPassword,
+			IsDebug:        *isDebug,
 		},
 		ServerConn: nil,
 		UserUIDMap: make(map[uint32]net.Conn),
