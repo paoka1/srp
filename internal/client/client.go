@@ -51,14 +51,14 @@ func (n *Client) CloseAllUserConn() {
 func (n *Client) EstablishConn() {
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", n.ServerIP, n.ServerPort))
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatal("与srp-server建立连接失败，" + err.Error())
 	}
 
 	// 发送密码
 	data := common.NewProto(common.CodeSuccess, common.TypePing, 0, []byte(n.ServerPassword))
 	dataByte, err := data.EncodeProto()
 	if err != nil {
-		log.Fatal("与srp-server建立连接失败，无法序列化数据：" + err.Error())
+		log.Fatal("与srp-server建立连接失败，无法构造数据：" + err.Error())
 	}
 
 	_, err = conn.Write(dataByte)
@@ -93,7 +93,7 @@ func (n *Client) HandleNewUserConn(data common.Proto) {
 	uid := data.UID
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", n.ServiceIP, n.ServicePort))
 	if err != nil {
-		log.Println(fmt.Sprintf("拒绝user(uid：%d)加入，无法创建本地套接字", uid))
+		log.Println(fmt.Sprintf("拒绝user(uid：%d)加入，无法创建本地套接字，%s", uid, err.Error()))
 		data = common.NewProto(common.CodeForbidden, common.TypeRejectUser, uid, []byte{})
 		isReject = true
 	} else {
@@ -103,13 +103,13 @@ func (n *Client) HandleNewUserConn(data common.Proto) {
 
 	dataByte, err := data.EncodeProto()
 	if err != nil {
-		log.Println(fmt.Sprintf("处理user(uid：%d)加入时无法序列化数据", uid))
+		log.Println(fmt.Sprintf("处理user(uid：%d)加入时无法处理数据，%s", uid, err.Error()))
 		conn.Close()
 		return
 	}
 
 	if _, err = n.ServerConn.Write(dataByte); err != nil {
-		log.Println("无法向srp-server发送处理user conn的数据")
+		log.Println("无法向srp-server发送处理user conn的数据，" + err.Error())
 		return
 	}
 
@@ -131,7 +131,7 @@ func (n *Client) HandleNewUserConn(data common.Proto) {
 		byteLen, err := conn.Read(dataByte)
 		if err != nil {
 			if err == io.EOF {
-				log.Println(fmt.Sprintf("和uid(%d)的本地连接(%s)的连接断开", uid, conn.LocalAddr().String()))
+				log.Println(fmt.Sprintf("和uid(%d)的本地连接(%s)的连接断开，%s", uid, conn.LocalAddr().String(), err.Error()))
 			} else {
 				log.Println(fmt.Sprintf("和uid(%d)的本地连接(%s)的连接断开，%s", uid, conn.LocalAddr().String(), err.Error()))
 			}
@@ -150,14 +150,14 @@ func (n *Client) HandleNewUserConn(data common.Proto) {
 		data = common.NewProto(common.CodeSuccess, common.TypeForwarding, uid, dataByte)
 		dataByteEncoded, err := data.EncodeProto()
 		if err != nil {
-			log.Println("序列化uid：" + strconv.Itoa(int(uid)) + "的本地连接" + conn.LocalAddr().String() + "的消息失败" + err.Error())
+			log.Println("处理uid：" + strconv.Itoa(int(uid)) + "的本地连接" + conn.LocalAddr().String() + "的消息失败，" + err.Error())
 			n.RemoveUserConn(uid)
 			conn.Close()
 			return
 		}
 
 		if _, err = n.ServerConn.Write(dataByteEncoded); err != nil {
-			log.Println("发送uid：" + strconv.Itoa(int(uid)) + "的本地连接" + conn.LocalAddr().String() + "的消息失败" + err.Error())
+			log.Println("发送uid：" + strconv.Itoa(int(uid)) + "的本地连接" + conn.LocalAddr().String() + "的消息失败，" + err.Error())
 			n.RemoveUserConn(uid)
 			conn.Close()
 			return

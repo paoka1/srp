@@ -53,11 +53,11 @@ func main() {
 			}
 			dataByte, err := data.EncodeProto()
 			if err != nil {
-				log.Println("丢弃user发往srp-client的数据包，无法序列化数据")
+				log.Println("丢弃user发往srp-client的数据包，无法处理数据，" + err.Error())
 				continue
 			}
 			if _, err := srpServer.ClientConn.Write(dataByte); err != nil {
-				log.Println("丢弃user发往srp-client的数据包，无法发送数据")
+				log.Println("丢弃user发往srp-client的数据包，无法发送数据，" + err.Error())
 				if errors.Is(err, io.EOF) {
 					srpServer.CloseClientConn()
 					srpServer.CloseAllUserConn()
@@ -83,7 +83,7 @@ func main() {
 				continue
 			}
 			if _, err := conn.Write(data.Payload); err != nil {
-				log.Println("丢弃srp-client发往user的数据包，无法发送数据")
+				log.Println("丢弃srp-client发往user的数据包，无法发送数据，" + err.Error())
 				continue
 			}
 			if srpServer.IsDebug {

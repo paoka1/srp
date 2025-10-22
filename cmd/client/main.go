@@ -53,7 +53,7 @@ func main() {
 	for {
 		if err := data.DecodeProto(reader); err != nil {
 			srpClient.CloseAllUserConn()
-			log.Fatal("反序列化srp-server消息失败" + err.Error())
+			log.Fatal("处理srp-server的数据失败：" + err.Error())
 		}
 
 		switch data.Type {
@@ -61,11 +61,11 @@ func main() {
 			go srpClient.HandleNewUserConn(data)
 		case common.TypeForwarding:
 			if srpClient.UserUIDMap[data.UID] == nil {
-				log.Println("收到uid：" + strconv.Itoa(int(data.UID)) + "的消息，无匹配uid")
+				log.Println("收到uid：" + strconv.Itoa(int(data.UID)) + "的数据，无匹配的uid")
 				continue
 			}
 			if _, err := srpClient.UserUIDMap[data.UID].Write(data.Payload); err != nil {
-				log.Println("收到uid：" + strconv.Itoa(int(data.UID)) + "的消息，无法转发到service")
+				log.Println("收到uid：" + strconv.Itoa(int(data.UID)) + "的数据，无法转发到service，" + err.Error())
 			}
 			if srpClient.IsDebug {
 				log.Println("转发数据到srp-server：")

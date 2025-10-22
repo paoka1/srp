@@ -86,7 +86,7 @@ func (s *Server) CloseAllUserConn() {
 func (s *Server) AcceptClient() {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", s.ClientPort))
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatal("无法创建tcp监听，" + err.Error())
 	}
 
 	for {
@@ -133,13 +133,13 @@ func (s *Server) HandleClient(conn net.Conn) {
 	dataByte, err := data.EncodeProto()
 	if err != nil {
 		conn.Close()
-		log.Println("拒绝srp-client:" + conn.RemoteAddr().String() + "的连接，无法序列化数据")
+		log.Println("拒绝srp-client:" + conn.RemoteAddr().String() + "的连接，无法处理数据，" + err.Error())
 		return
 	}
 
 	if _, err = conn.Write(dataByte); err != nil {
 		conn.Close()
-		log.Println("拒绝srp-client:" + conn.RemoteAddr().String() + "的连接，无法发送数据")
+		log.Println("拒绝srp-client:" + conn.RemoteAddr().String() + "的连接，无法发送数据，" + err.Error())
 		return
 	}
 
@@ -158,12 +158,12 @@ func (s *Server) HandleClient(conn net.Conn) {
 	for {
 		if err = data.DecodeProto(reader); err != nil {
 			if errors.Is(err, io.EOF) {
-				log.Println("srp-client：" + conn.RemoteAddr().String() + "断开连接")
+				log.Println("srp-client：" + conn.RemoteAddr().String() + "断开连接，" + err.Error())
 				s.CloseClientConn()
 				s.CloseAllUserConn()
 				return
 			} else {
-				log.Println("读取srp-client：" + conn.RemoteAddr().String() + "的数据失败" + err.Error())
+				log.Println("读取srp-client：" + conn.RemoteAddr().String() + "的数据失败，" + err.Error())
 			}
 			continue
 		}
@@ -178,7 +178,7 @@ func (s *Server) HandleClient(conn net.Conn) {
 func (s *Server) AcceptUserConn() {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", s.UserPort))
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatal("无法监听tcp连接，" + err.Error())
 	}
 	for {
 		conn, err := listener.Accept()
@@ -244,9 +244,9 @@ func (s *Server) HandleUserConn(conn net.Conn) {
 		byteLen, err := conn.Read(dataByte)
 		if err != nil {
 			if err == io.EOF {
-				log.Println("与user：" + conn.RemoteAddr().String() + "连接失效" + err.Error())
+				log.Println("与user：" + conn.RemoteAddr().String() + "连接失效，" + err.Error())
 			} else {
-				log.Println("user：" + conn.RemoteAddr().String() + "断开连接")
+				log.Println("user：" + conn.RemoteAddr().String() + "断开连接，" + err.Error())
 			}
 			if _, ok := s.UserUIDMap[data.UID]; ok {
 				data = common.NewProto(common.CodeSuccess, common.TypeDisconnection, uid, []byte{})
