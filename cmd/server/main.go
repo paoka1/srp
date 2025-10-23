@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"srp/internal/common"
 	"srp/internal/server"
@@ -53,11 +52,11 @@ func main() {
 			}
 			dataByte, err := data.EncodeProto()
 			if err != nil {
-				log.Println("丢弃user发往srp-client的数据包，无法处理数据，" + err.Error())
+				logger.LogWithLevel(srpServer.LogLevel, 2, "丢弃user发往srp-client的数据包，无法处理数据，"+err.Error())
 				continue
 			}
 			if _, err := srpServer.ClientConn.Write(dataByte); err != nil {
-				log.Println("丢弃user发往srp-client的数据包，无法发送数据，" + err.Error())
+				logger.LogWithLevel(srpServer.LogLevel, 2, "丢弃user发往srp-client的数据包，无法发送数据，"+err.Error())
 				if errors.Is(err, io.EOF) {
 					srpServer.CloseClientConn()
 					srpServer.CloseAllUserConn()
@@ -72,18 +71,18 @@ func main() {
 				if conn, ok := srpServer.UserUIDMap[data.UID]; ok {
 					srpServer.RemoveUserConn(data.UID)
 					conn.Close()
-					log.Println(fmt.Sprintf("关闭user(uid：%d)的连接", data.UID))
+					logger.LogWithLevel(srpServer.LogLevel, 2, fmt.Sprintf("关闭user(uid：%d)的连接", data.UID))
 				}
 				continue
 			}
 
 			conn := srpServer.UserUIDMap[data.UID]
 			if conn == nil {
-				log.Println(fmt.Sprintf("丢弃srp-client发往user的数据包，无效的uid：%d", data.UID))
+				logger.LogWithLevel(srpServer.LogLevel, 2, fmt.Sprintf("丢弃srp-client发往user的数据包，无效的uid：%d", data.UID))
 				continue
 			}
 			if _, err := conn.Write(data.Payload); err != nil {
-				log.Println("丢弃srp-client发往user的数据包，无法发送数据，" + err.Error())
+				logger.LogWithLevel(srpServer.LogLevel, 2, "丢弃srp-client发往user的数据包，无法发送数据，"+err.Error())
 				continue
 			}
 

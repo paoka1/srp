@@ -61,11 +61,11 @@ func main() {
 			go srpClient.HandleNewUserConn(data)
 		case common.TypeForwarding:
 			if srpClient.UserUIDMap[data.UID] == nil {
-				log.Println("收到uid：" + strconv.Itoa(int(data.UID)) + "的数据，无匹配的uid")
+				logger.LogWithLevel(srpClient.LogLevel, 2, "收到uid："+strconv.Itoa(int(data.UID))+"的数据，无匹配的uid")
 				continue
 			}
 			if _, err := srpClient.UserUIDMap[data.UID].Write(data.Payload); err != nil {
-				log.Println("收到uid：" + strconv.Itoa(int(data.UID)) + "的数据，无法转发到service，" + err.Error())
+				logger.LogWithLevel(srpClient.LogLevel, 2, "收到uid："+strconv.Itoa(int(data.UID))+"的数据，无法转发到service，"+err.Error())
 			}
 
 			logger.LogWithLevel(srpClient.LogLevel, 2, fmt.Sprintf("转发数据到srp-server，有效载荷大小：%dbyte", data.PayloadLen))
@@ -75,7 +75,7 @@ func main() {
 			if conn, ok := srpClient.UserUIDMap[data.UID]; ok {
 				srpClient.RemoveUserConn(data.UID)
 				conn.Close()
-				log.Println(fmt.Sprintf("关闭uid：%d的连接", data.UID))
+				logger.LogWithLevel(srpClient.LogLevel, 2, fmt.Sprintf("关闭uid：%d的连接", data.UID))
 			}
 		}
 	}
