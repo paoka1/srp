@@ -2,5 +2,5 @@ package common
 
 const (
 	DefaultServerPasswd = "default_password"
-	MaxBufferSize       = 1024 * 1024
+	MaxBufferSize       = 1500 // 大约等于以太网 MTU
 )
