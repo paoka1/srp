@@ -1,6 +1,9 @@
 package logger
 
-import "log"
+import (
+	"fmt"
+	"log"
+)
 
 const MaxLogLevel = 3
 
@@ -13,17 +16,9 @@ func SetLogFormat() {
 // ol: on level 指定的日志级别
 // v: 日志内容
 func LogWithLevel(rl int, ol int, v interface{}) {
-	if rl <= 1 && ol == 1 {
-		log.Println(v)
-		return
-	}
-
-	if rl > MaxLogLevel {
-		log.Println(v)
-		return
-	}
-
-	if rl >= ol {
-		log.Println(v)
+	// 判断是否需要打印
+	if (rl <= 1 && ol == 1) || rl > MaxLogLevel || rl >= ol {
+		// call depth = 2 表示向上两层获取文件名和行号
+		log.Output(2, fmt.Sprint(v))
 	}
 }
