@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"srp/internal/common"
+	"srp/pkg/logger"
 	"sync"
 	"time"
 )
@@ -16,7 +17,7 @@ type Config struct {
 	ClientPort     int // srp client port
 	UserPort       int // user port
 	ServerPassword string
-	IsDebug        bool
+	LogLevel       int
 }
 
 type Server struct {
@@ -92,10 +93,10 @@ func (s *Server) AcceptClient() {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Println("拒绝srp-client：" + conn.RemoteAddr().String() + "的连接，" + err.Error())
+			logger.LogWithLevel(s.LogLevel, 2, "拒绝srp-client："+conn.RemoteAddr().String()+"的连接，"+err.Error())
 			continue
 		} else {
-			log.Println("开始处理srp-client：" + conn.RemoteAddr().String() + "的连接")
+			logger.LogWithLevel(s.LogLevel, 1, "开始处理srp-client："+conn.RemoteAddr().String()+"的连接")
 		}
 		go s.HandleClient(conn)
 	}
@@ -109,7 +110,7 @@ func (s *Server) HandleClient(conn net.Conn) {
 	// 已存在连接，断开连接请求
 	if s.ClientConn != nil {
 		conn.Close()
-		log.Println("存在已连接的srp-client，拒绝：" + conn.RemoteAddr().String() + "的连接")
+		logger.LogWithLevel(s.LogLevel, 2, "存在已连接的srp-client，拒绝："+conn.RemoteAddr().String()+"的连接")
 		return
 	}
 
@@ -118,7 +119,7 @@ func (s *Server) HandleClient(conn net.Conn) {
 	reader := bufio.NewReader(conn)
 	if err := data.DecodeProto(reader); err != nil {
 		conn.Close()
-		log.Println("拒绝srp-client：" + conn.RemoteAddr().String() + "的连接，" + err.Error())
+		logger.LogWithLevel(s.LogLevel, 2, "拒绝srp-client："+conn.RemoteAddr().String()+"的连接，"+err.Error())
 		return
 	}
 
@@ -133,34 +134,34 @@ func (s *Server) HandleClient(conn net.Conn) {
 	dataByte, err := data.EncodeProto()
 	if err != nil {
 		conn.Close()
-		log.Println("拒绝srp-client:" + conn.RemoteAddr().String() + "的连接，无法处理数据，" + err.Error())
+		logger.LogWithLevel(s.LogLevel, 2, "拒绝srp-client:"+conn.RemoteAddr().String()+"的连接，无法处理数据，"+err.Error())
 		return
 	}
 
 	if _, err = conn.Write(dataByte); err != nil {
 		conn.Close()
-		log.Println("拒绝srp-client:" + conn.RemoteAddr().String() + "的连接，无法发送数据，" + err.Error())
+		logger.LogWithLevel(s.LogLevel, 2, "拒绝srp-client:"+conn.RemoteAddr().String()+"的连接，无法发送数据，"+err.Error())
 		return
 	}
 
 	if authFailed {
 		conn.Close()
-		log.Println("拒绝srp-client:" + conn.RemoteAddr().String() + "的连接，密码错误")
+		logger.LogWithLevel(s.LogLevel, 1, "拒绝srp-client:"+conn.RemoteAddr().String()+"的连接，密码错误")
 		return
 	}
 
 	s.ClientConn = conn
 	// 无限时长
 	conn.SetReadDeadline(time.Time{})
-	log.Println("成功建立与srp-client:" + conn.RemoteAddr().String() + "的连接")
+	logger.LogWithLevel(s.LogLevel, 1, "成功建立与srp-client:"+conn.RemoteAddr().String()+"的连接")
 
 	// 接收来自 srp-client 的消息，放到 DataChan2User
 	for {
 		if err = data.DecodeProto(reader); err != nil {
 			if errors.Is(err, io.EOF) {
-				log.Println("srp-client：" + conn.RemoteAddr().String() + "断开连接，" + err.Error())
+				logger.LogWithLevel(s.LogLevel, 2, "srp-client："+conn.RemoteAddr().String()+"断开连接，"+err.Error())
 			} else {
-				log.Println("读取srp-client：" + conn.RemoteAddr().String() + "的数据失败，" + err.Error())
+				logger.LogWithLevel(s.LogLevel, 2, "读取srp-client："+conn.RemoteAddr().String()+"的数据失败，"+err.Error())
 			}
 			s.CloseClientConn()
 			s.CloseAllUserConn()
@@ -182,7 +183,7 @@ func (s *Server) AcceptUserConn() {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Println("拒绝user：" + conn.RemoteAddr().String() + " 的连接，" + err.Error())
+			logger.LogWithLevel(s.LogLevel, 2, "拒绝user："+conn.RemoteAddr().String()+" 的连接，"+err.Error())
 			continue
 		}
 		go s.HandleUserConn(conn)
@@ -193,7 +194,7 @@ func (s *Server) AcceptUserConn() {
 func (s *Server) HandleUserConn(conn net.Conn) {
 	if s.ClientConn == nil {
 		conn.Close()
-		log.Println("srp-client连接为空，拒绝user：" + conn.RemoteAddr().String() + "的连接")
+		logger.LogWithLevel(s.LogLevel, 2, "srp-client连接为空，拒绝user："+conn.RemoteAddr().String()+"的连接")
 		return
 	}
 
@@ -202,17 +203,17 @@ func (s *Server) HandleUserConn(conn net.Conn) {
 	data := common.NewProto(common.CodeSuccess, common.TypeNewUser, uid, nil)
 	dataByte, err := data.EncodeProto()
 	if err != nil {
-		log.Println("拒绝user：" + conn.RemoteAddr().String() + "的连接，" + err.Error())
+		logger.LogWithLevel(s.LogLevel, 2, "拒绝user："+conn.RemoteAddr().String()+"的连接，"+err.Error())
 		conn.Close()
 		return
 	}
 
 	if _, err = s.ClientConn.Write(dataByte); err != nil {
-		log.Println("拒绝user：" + conn.RemoteAddr().String() + "的连接，" + err.Error())
+		logger.LogWithLevel(s.LogLevel, 2, "拒绝user："+conn.RemoteAddr().String()+"的连接，"+err.Error())
 		conn.Close()
 		return
 	}
-	log.Println(fmt.Sprintf("已向srp-client发送user(%s)的连接申请", conn.RemoteAddr().String()))
+	logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("已向srp-client发送user(%s)的连接申请", conn.RemoteAddr().String()))
 
 	// 验证 TypeAcceptUser
 	for {
@@ -226,7 +227,7 @@ func (s *Server) HandleUserConn(conn net.Conn) {
 	}
 
 	if data.Code != common.CodeSuccess || data.Type != common.TypeAcceptUser {
-		log.Println("拒绝user：" + conn.RemoteAddr().String() + "的连接，srp-client拒绝连接")
+		logger.LogWithLevel(s.LogLevel, 2, "拒绝user："+conn.RemoteAddr().String()+"的连接，srp-client拒绝连接")
 		conn.Close()
 		return
 	}
@@ -235,7 +236,7 @@ func (s *Server) HandleUserConn(conn net.Conn) {
 	tcpConn.SetKeepAlive(true)
 
 	s.AddUserConn(uid, conn)
-	log.Println(fmt.Sprintf("建立连接(uid：%d)：%s->%s", uid, conn.LocalAddr().String(), conn.RemoteAddr().String()))
+	logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("建立连接(uid：%d)：%s->%s", uid, conn.LocalAddr().String(), conn.RemoteAddr().String()))
 
 	// 读取消息，放到 DataChan2Client
 	for {
@@ -243,9 +244,9 @@ func (s *Server) HandleUserConn(conn net.Conn) {
 		byteLen, err := conn.Read(dataByte)
 		if err != nil {
 			if err == io.EOF {
-				log.Println("与user：" + conn.RemoteAddr().String() + "连接失效，" + err.Error())
+				logger.LogWithLevel(s.LogLevel, 2, "与user："+conn.RemoteAddr().String()+"连接失效，"+err.Error())
 			} else {
-				log.Println("user：" + conn.RemoteAddr().String() + "断开连接，" + err.Error())
+				logger.LogWithLevel(s.LogLevel, 2, "user："+conn.RemoteAddr().String()+"断开连接，"+err.Error())
 			}
 			if _, ok := s.UserUIDMap[data.UID]; ok {
 				data = common.NewProto(common.CodeSuccess, common.TypeDisconnection, uid, []byte{})

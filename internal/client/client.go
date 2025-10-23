@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"srp/internal/common"
+	"srp/pkg/logger"
 	"strconv"
 	"sync"
 )
@@ -17,7 +18,7 @@ type Config struct {
 	ServiceIP      string // service ip
 	ServicePort    int    // service port
 	ServerPassword string
-	IsDebug        bool
+	LogLevel       int
 }
 
 type Client struct {
@@ -65,7 +66,7 @@ func (n *Client) EstablishConn() {
 	if err != nil {
 		log.Fatal("与srp-server建立连接失败：" + err.Error())
 	}
-	log.Println("已向srp-server发送验证信息，等待响应")
+	logger.LogWithLevel(n.LogLevel, 2, "已向srp-server发送验证信息，等待响应")
 
 	// 接收响应
 	reader := bufio.NewReader(conn)
@@ -83,7 +84,7 @@ func (n *Client) EstablishConn() {
 	tcpConn.SetKeepAlive(true)
 
 	n.ServerConn = conn
-	log.Println("成功与srp-server建立连接")
+	logger.LogWithLevel(n.LogLevel, 1, "成功与srp-server建立连接")
 }
 
 func (n *Client) HandleNewUserConn(data common.Proto) {
@@ -93,7 +94,7 @@ func (n *Client) HandleNewUserConn(data common.Proto) {
 	uid := data.UID
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", n.ServiceIP, n.ServicePort))
 	if err != nil {
-		log.Println(fmt.Sprintf("拒绝user(uid：%d)加入，无法创建本地套接字，%s", uid, err.Error()))
+		logger.LogWithLevel(n.LogLevel, 2, fmt.Sprintf("拒绝user(uid：%d)加入，无法创建本地套接字，%s", uid, err.Error()))
 		data = common.NewProto(common.CodeForbidden, common.TypeRejectUser, uid, []byte{})
 		isReject = true
 	} else {
@@ -103,13 +104,13 @@ func (n *Client) HandleNewUserConn(data common.Proto) {
 
 	dataByte, err := data.EncodeProto()
 	if err != nil {
-		log.Println(fmt.Sprintf("处理user(uid：%d)加入时无法处理数据，%s", uid, err.Error()))
+		logger.LogWithLevel(n.LogLevel, 2, fmt.Sprintf("处理user(uid：%d)加入时无法处理数据，%s", uid, err.Error()))
 		conn.Close()
 		return
 	}
 
 	if _, err = n.ServerConn.Write(dataByte); err != nil {
-		log.Println("无法向srp-server发送处理user conn的数据，" + err.Error())
+		logger.LogWithLevel(n.LogLevel, 2, "无法向srp-server发送处理user conn的数据，"+err.Error())
 		return
 	}
 
@@ -122,7 +123,7 @@ func (n *Client) HandleNewUserConn(data common.Proto) {
 	tcpConn.SetKeepAlive(true)
 
 	n.AddUserConn(uid, conn)
-	log.Println(fmt.Sprintf("建立连接(uid：%d)：%s->%s", uid, conn.LocalAddr().String(), conn.RemoteAddr().String()))
+	logger.LogWithLevel(n.LogLevel, 2, fmt.Sprintf("建立连接(uid：%d)：%s->%s", uid, conn.LocalAddr().String(), conn.RemoteAddr().String()))
 
 	// 阻塞在获取 service 消息处
 	// 获得消息后立刻包装发送
@@ -131,9 +132,9 @@ func (n *Client) HandleNewUserConn(data common.Proto) {
 		byteLen, err := conn.Read(dataByte)
 		if err != nil {
 			if err == io.EOF {
-				log.Println(fmt.Sprintf("和uid(%d)的本地连接(%s)的连接断开，%s", uid, conn.LocalAddr().String(), err.Error()))
+				logger.LogWithLevel(n.LogLevel, 2, fmt.Sprintf("和uid(%d)的本地连接(%s)的连接断开，%s", uid, conn.LocalAddr().String(), err.Error()))
 			} else {
-				log.Println(fmt.Sprintf("和uid(%d)的本地连接(%s)的连接断开，%s", uid, conn.LocalAddr().String(), err.Error()))
+				logger.LogWithLevel(n.LogLevel, 2, fmt.Sprintf("和uid(%d)的本地连接(%s)的连接断开，%s", uid, conn.LocalAddr().String(), err.Error()))
 			}
 			data = common.NewProto(common.CodeSuccess, common.TypeDisconnection, uid, []byte{})
 			if _, ok := n.UserUIDMap[data.UID]; ok {
@@ -150,14 +151,14 @@ func (n *Client) HandleNewUserConn(data common.Proto) {
 		data = common.NewProto(common.CodeSuccess, common.TypeForwarding, uid, dataByte)
 		dataByteEncoded, err := data.EncodeProto()
 		if err != nil {
-			log.Println("处理uid：" + strconv.Itoa(int(uid)) + "的本地连接" + conn.LocalAddr().String() + "的消息失败，" + err.Error())
+			logger.LogWithLevel(n.LogLevel, 2, "处理uid："+strconv.Itoa(int(uid))+"的本地连接"+conn.LocalAddr().String()+"的消息失败，"+err.Error())
 			n.RemoveUserConn(uid)
 			conn.Close()
 			return
 		}
 
 		if _, err = n.ServerConn.Write(dataByteEncoded); err != nil {
-			log.Println("发送uid：" + strconv.Itoa(int(uid)) + "的本地连接" + conn.LocalAddr().String() + "的消息失败，" + err.Error())
+			logger.LogWithLevel(n.LogLevel, 2, "发送uid："+strconv.Itoa(int(uid))+"的本地连接"+conn.LocalAddr().String()+"的消息失败，"+err.Error())
 			n.RemoveUserConn(uid)
 			conn.Close()
 			return

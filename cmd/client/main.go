@@ -21,7 +21,7 @@ func main() {
 	serviceIP := flag.String("service-ip", "127.0.0.1", "被转发服务的IP地址")
 	servicePort := flag.Int("service-port", 3000, "被转发服务的端口")
 	serverPassword := flag.String("server-pwd", common.DefaultServerPasswd, "连接srp-server的密码")
-	isDebug := flag.Bool("debug", false, "开启调试模式")
+	logLevel := flag.Int("log-level", 1, fmt.Sprintf("日志级别（1-%d）", logger.MaxLogLevel))
 	flag.Parse()
 
 	srpClient := client.Client{
@@ -31,7 +31,7 @@ func main() {
 			ServiceIP:      *serviceIP,
 			ServicePort:    *servicePort,
 			ServerPassword: *serverPassword,
-			IsDebug:        *isDebug,
+			LogLevel:       *logLevel,
 		},
 		ServerConn: nil,
 		UserUIDMap: make(map[uint32]net.Conn),
@@ -67,10 +67,10 @@ func main() {
 			if _, err := srpClient.UserUIDMap[data.UID].Write(data.Payload); err != nil {
 				log.Println("收到uid：" + strconv.Itoa(int(data.UID)) + "的数据，无法转发到service，" + err.Error())
 			}
-			if srpClient.IsDebug {
-				log.Println("转发数据到srp-server：")
-				log.Println(data.String())
-			}
+
+			logger.LogWithLevel(srpClient.LogLevel, 2, fmt.Sprintf("转发数据到srp-server，有效载荷大小：%dbyte", data.PayloadLen))
+			logger.LogWithLevel(srpClient.LogLevel, 3, "转发数据到srp-server：")
+			logger.LogWithLevel(srpClient.LogLevel, 3, data.String())
 		case common.TypeDisconnection:
 			if conn, ok := srpClient.UserUIDMap[data.UID]; ok {
 				srpClient.RemoveUserConn(data.UID)
