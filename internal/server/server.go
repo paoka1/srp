@@ -14,7 +14,7 @@ import (
 )
 
 type Config struct {
-	ClientPort     int // srp client port
+	ClientPort     int // srp-client port
 	UserPort       int // user port
 	ServerPassword string
 	LogLevel       int
@@ -55,17 +55,6 @@ func (s *Server) CloseClientConn() {
 	}
 }
 
-func (s *Server) NewClientConn(conn net.Conn) error {
-	s.Mu.Lock()
-	defer s.Mu.Unlock()
-	if s.ClientConn == nil {
-		s.ClientConn = conn
-		return nil
-	} else {
-		return errors.New("存在已连接的srp-client，拒绝" + conn.RemoteAddr().String() + "的连接")
-	}
-}
-
 func (s *Server) GetNextCID() uint32 {
 	s.Mu.Lock()
 	defer func() {
@@ -98,7 +87,7 @@ func (s *Server) AcceptClient() {
 		} else {
 			logger.LogWithLevel(s.LogLevel, 1, "开始处理srp-client："+conn.RemoteAddr().String()+"的连接")
 		}
-		go s.HandleClient(conn)
+		s.HandleClient(conn)
 	}
 }
 
@@ -106,13 +95,6 @@ func (s *Server) AcceptClient() {
 func (s *Server) HandleClient(conn net.Conn) {
 	// 设置期限
 	conn.SetReadDeadline(time.Now().Add(3 * time.Second))
-
-	// 已存在连接，断开连接请求
-	if s.ClientConn != nil {
-		conn.Close()
-		logger.LogWithLevel(s.LogLevel, 2, "存在已连接的srp-client，拒绝："+conn.RemoteAddr().String()+"的连接")
-		return
-	}
 
 	// 完成验证
 	data := common.Proto{}

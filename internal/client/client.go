@@ -2,6 +2,7 @@ package client
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -9,11 +10,12 @@ import (
 	"srp/pkg/logger"
 	"strconv"
 	"sync"
+	"time"
 )
 
 type Config struct {
-	ServerIP       string // srp server ip
-	ServerPort     int    // srp server port
+	ServerIP       string // srp-server ip
+	ServerPort     int    // srp-server port
 	ServiceIP      string // service ip
 	ServicePort    int    // service port
 	ServerPassword string
@@ -69,12 +71,24 @@ func (c *Client) EstablishConn() {
 	}
 	logger.LogWithLevel(c.LogLevel, 2, "已向srp-server发送验证信息，等待响应")
 
+	// 在 srp-server 在处理连接或已存在连接时，主动退出
+	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+
 	// 接收响应
 	reader := bufio.NewReader(conn)
 	if err = data.DecodeProto(reader); err != nil {
 		conn.Close()
-		log.Fatal("与srp-server建立连接失败：" + err.Error())
+		// 判断是否超时
+		var netErr net.Error
+		if errors.As(err, &netErr) && netErr.Timeout() {
+			log.Fatal("连接超时，请检查必要信息，然后在稍后重试")
+		} else {
+			log.Fatal("与 srp-server 建立连接失败：" + err.Error())
+		}
 	}
+
+	// 取消过期时长
+	conn.SetReadDeadline(time.Time{})
 
 	if data.Code != common.CodeSuccess {
 		conn.Close()
