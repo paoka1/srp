@@ -23,9 +23,9 @@ type Config struct {
 type Server struct {
 	Config
 
-	CIDNext    uint32
-	ClientConn net.Conn
-	CIDMap     map[uint32]net.Conn // Connection ID to Connection
+	CIDNext       uint32
+	ClientConn    net.Conn
+	UserConnIDMap map[uint32]net.Conn // Map of User Connection ID to Connection
 
 	DataChan2User   chan common.Proto // data channel to user
 	DataChan2Client chan common.Proto // data channel to client
@@ -37,13 +37,13 @@ type Server struct {
 func (s *Server) AddUserConn(cid uint32, conn net.Conn) {
 	s.Mu.Lock()
 	defer s.Mu.Unlock()
-	s.CIDMap[cid] = conn
+	s.UserConnIDMap[cid] = conn
 }
 
 func (s *Server) RemoveUserConn(cid uint32) {
 	s.Mu.Lock()
 	defer s.Mu.Unlock()
-	delete(s.CIDMap, cid)
+	delete(s.UserConnIDMap, cid)
 }
 
 func (s *Server) CloseClientConn() {
@@ -66,7 +66,7 @@ func (s *Server) NewClientConn(conn net.Conn) error {
 	}
 }
 
-func (s *Server) GetNextcid() uint32 {
+func (s *Server) GetNextCID() uint32 {
 	s.Mu.Lock()
 	defer func() {
 		s.CIDNext++
@@ -78,10 +78,10 @@ func (s *Server) GetNextcid() uint32 {
 func (s *Server) CloseAllUserConn() {
 	s.Mu.Lock()
 	defer s.Mu.Unlock()
-	for _, c := range s.CIDMap {
+	for _, c := range s.UserConnIDMap {
 		c.Close()
 	}
-	s.CIDMap = make(map[uint32]net.Conn)
+	s.UserConnIDMap = make(map[uint32]net.Conn)
 }
 
 func (s *Server) AcceptClient() {
@@ -199,7 +199,7 @@ func (s *Server) HandleUserConn(conn net.Conn) {
 	}
 
 	// 完成注册
-	cid := s.GetNextcid()
+	cid := s.GetNextCID()
 	data := common.NewProto(common.CodeSuccess, common.TypeNewConn, cid, nil)
 	dataByte, err := data.EncodeProto()
 	if err != nil {
@@ -248,7 +248,7 @@ func (s *Server) HandleUserConn(conn net.Conn) {
 			} else {
 				logger.LogWithLevel(s.LogLevel, 2, "user："+conn.RemoteAddr().String()+"断开连接，"+err.Error())
 			}
-			if _, ok := s.CIDMap[data.CID]; ok {
+			if _, ok := s.UserConnIDMap[data.CID]; ok {
 				data = common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte{})
 				s.DataChan2Client <- data
 				s.RemoveUserConn(cid)

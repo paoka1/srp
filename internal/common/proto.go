@@ -20,9 +20,9 @@ const (
 const (
 	TypePing       TypeCode = 1 // srp-client 验证
 	TypePong       TypeCode = 2 // srp-server 响应
-	TypeNewConn    TypeCode = 3 // 新的 user 连接
-	TypeAcceptConn TypeCode = 4 // 同意 user 连接
-	TypeRejectConn TypeCode = 5 // 拒绝 user 连接
+	TypeNewConn    TypeCode = 3 // 新的连接
+	TypeAcceptConn TypeCode = 4 // 同意连接
+	TypeRejectConn TypeCode = 5 // 拒绝连接
 	TypeForwarding TypeCode = 6 // 数据转发
 	TypeDisconnect TypeCode = 7 // 断开连接
 )
@@ -42,10 +42,12 @@ var typeCodeMap = map[TypeCode]string{
 	TypeDisconnect: "TypeDisconnect",
 }
 
+// Proto 为 srp-client 和 srp-server 之间的网络协议
+// 基于 TCP 协议设计，包含：状态、类型、连接序号、有效载荷长度和有效载荷字段
 type Proto struct {
 	Code       StatusCode
 	Type       TypeCode
-	CID        uint32 // User CID
+	CID        uint32 // Connection ID
 	PayloadLen uint32 // Payload 长度
 	Payload    []byte
 }

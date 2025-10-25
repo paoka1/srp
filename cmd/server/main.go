@@ -30,7 +30,7 @@ func main() {
 		},
 		ClientConn:      nil,
 		CIDNext:         1,
-		CIDMap:          make(map[uint32]net.Conn),
+		UserConnIDMap:   make(map[uint32]net.Conn),
 		DataChan2User:   make(chan common.Proto, 100),
 		DataChan2Client: make(chan common.Proto, 100),
 		DataChan2Handle: make(chan common.Proto, 100),
@@ -68,7 +68,7 @@ func main() {
 			logger.LogWithLevel(srpServer.LogLevel, 3, data.String())
 		case data := <-srpServer.DataChan2User:
 			if data.Type == common.TypeDisconnect {
-				if conn, ok := srpServer.CIDMap[data.CID]; ok {
+				if conn, ok := srpServer.UserConnIDMap[data.CID]; ok {
 					srpServer.RemoveUserConn(data.CID)
 					conn.Close()
 					logger.LogWithLevel(srpServer.LogLevel, 2, fmt.Sprintf("关闭user(cid：%d)的连接", data.CID))
@@ -76,7 +76,7 @@ func main() {
 				continue
 			}
 
-			conn := srpServer.CIDMap[data.CID]
+			conn := srpServer.UserConnIDMap[data.CID]
 			if conn == nil {
 				logger.LogWithLevel(srpServer.LogLevel, 2, fmt.Sprintf("丢弃srp-client发往user的数据包，无效的cid：%d", data.CID))
 				continue
