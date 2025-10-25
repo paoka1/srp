@@ -167,7 +167,7 @@ func (s *Server) HandleClient(conn net.Conn) {
 			s.CloseAllUserConn()
 			return
 		}
-		if data.Type == common.TypeAcceptUser || data.Type == common.TypeRejectUser {
+		if data.Type == common.TypeAcceptConn || data.Type == common.TypeRejectConn {
 			s.DataChan2Handle <- data
 		} else {
 			s.DataChan2User <- data
@@ -200,7 +200,7 @@ func (s *Server) HandleUserConn(conn net.Conn) {
 
 	// 完成注册
 	cid := s.GetNextcid()
-	data := common.NewProto(common.CodeSuccess, common.TypeNewUser, cid, nil)
+	data := common.NewProto(common.CodeSuccess, common.TypeNewConn, cid, nil)
 	dataByte, err := data.EncodeProto()
 	if err != nil {
 		logger.LogWithLevel(s.LogLevel, 2, "拒绝user："+conn.RemoteAddr().String()+"的连接，"+err.Error())
@@ -215,7 +215,7 @@ func (s *Server) HandleUserConn(conn net.Conn) {
 	}
 	logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("已向srp-client发送user(%s)的连接申请", conn.RemoteAddr().String()))
 
-	// 验证 TypeAcceptUser
+	// 验证 TypeAcceptConn
 	for {
 		data = <-s.DataChan2Handle
 		if data.CID != cid {
@@ -226,7 +226,7 @@ func (s *Server) HandleUserConn(conn net.Conn) {
 		break
 	}
 
-	if data.Code != common.CodeSuccess || data.Type != common.TypeAcceptUser {
+	if data.Code != common.CodeSuccess || data.Type != common.TypeAcceptConn {
 		logger.LogWithLevel(s.LogLevel, 2, "拒绝user："+conn.RemoteAddr().String()+"的连接，srp-client拒绝连接")
 		conn.Close()
 		return
@@ -249,7 +249,7 @@ func (s *Server) HandleUserConn(conn net.Conn) {
 				logger.LogWithLevel(s.LogLevel, 2, "user："+conn.RemoteAddr().String()+"断开连接，"+err.Error())
 			}
 			if _, ok := s.CIDMap[data.CID]; ok {
-				data = common.NewProto(common.CodeSuccess, common.TypeDisconnection, cid, []byte{})
+				data = common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte{})
 				s.DataChan2Client <- data
 				s.RemoveUserConn(cid)
 			}

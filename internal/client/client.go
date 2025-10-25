@@ -95,10 +95,10 @@ func (c *Client) HandleNewUserConn(data common.Proto) {
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", c.ServiceIP, c.ServicePort))
 	if err != nil {
 		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("拒绝连接(cid：%d)，无法创建本地套接字，%s", cid, err.Error()))
-		data = common.NewProto(common.CodeForbidden, common.TypeRejectUser, cid, []byte{})
+		data = common.NewProto(common.CodeForbidden, common.TypeRejectConn, cid, []byte{})
 		isReject = true
 	} else {
-		data = common.NewProto(common.CodeSuccess, common.TypeAcceptUser, cid, []byte{})
+		data = common.NewProto(common.CodeSuccess, common.TypeAcceptConn, cid, []byte{})
 		isReject = false
 	}
 
@@ -136,7 +136,7 @@ func (c *Client) HandleNewUserConn(data common.Proto) {
 			} else {
 				logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("和连接(cid：%d)的本地连接(%s)的连接断开，%s", cid, conn.LocalAddr().String(), err.Error()))
 			}
-			data = common.NewProto(common.CodeSuccess, common.TypeDisconnection, cid, []byte{})
+			data = common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte{})
 			if _, ok := c.CIDMap[data.CID]; ok {
 				dataByteEncoded, _ := data.EncodeProto()
 				c.ServerConn.Write(dataByteEncoded)

@@ -67,7 +67,7 @@ func main() {
 			logger.LogWithLevel(srpServer.LogLevel, 3, "转发数据到srp-client：")
 			logger.LogWithLevel(srpServer.LogLevel, 3, data.String())
 		case data := <-srpServer.DataChan2User:
-			if data.Type == common.TypeDisconnection {
+			if data.Type == common.TypeDisconnect {
 				if conn, ok := srpServer.CIDMap[data.CID]; ok {
 					srpServer.RemoveUserConn(data.CID)
 					conn.Close()

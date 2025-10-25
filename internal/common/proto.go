@@ -18,13 +18,13 @@ const (
 )
 
 const (
-	TypePing          TypeCode = 1 // srp-client 验证
-	TypePong          TypeCode = 2 // srp-server 响应
-	TypeNewUser       TypeCode = 3 // 新的 user 连接
-	TypeAcceptUser    TypeCode = 4 // 同意 user 连接
-	TypeRejectUser    TypeCode = 5 // 拒绝 user 连接
-	TypeForwarding    TypeCode = 6 // 数据转发
-	TypeDisconnection TypeCode = 7 // 断开连接
+	TypePing       TypeCode = 1 // srp-client 验证
+	TypePong       TypeCode = 2 // srp-server 响应
+	TypeNewConn    TypeCode = 3 // 新的 user 连接
+	TypeAcceptConn TypeCode = 4 // 同意 user 连接
+	TypeRejectConn TypeCode = 5 // 拒绝 user 连接
+	TypeForwarding TypeCode = 6 // 数据转发
+	TypeDisconnect TypeCode = 7 // 断开连接
 )
 
 var statusCodeMap = map[StatusCode]string{
@@ -33,13 +33,13 @@ var statusCodeMap = map[StatusCode]string{
 }
 
 var typeCodeMap = map[TypeCode]string{
-	TypePing:          "TypePing",
-	TypePong:          "TypePong",
-	TypeNewUser:       "TypeNewUser",
-	TypeAcceptUser:    "TypeAcceptUser",
-	TypeRejectUser:    "TypeRejectUser",
-	TypeForwarding:    "TypeForwarding",
-	TypeDisconnection: "TypeDisconnection",
+	TypePing:       "TypePing",
+	TypePong:       "TypePong",
+	TypeNewConn:    "TypeNewConn",
+	TypeAcceptConn: "TypeAcceptConn",
+	TypeRejectConn: "TypeRejectConn",
+	TypeForwarding: "TypeForwarding",
+	TypeDisconnect: "TypeDisconnect",
 }
 
 type Proto struct {

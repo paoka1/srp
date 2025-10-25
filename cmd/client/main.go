@@ -57,7 +57,7 @@ func main() {
 		}
 
 		switch data.Type {
-		case common.TypeNewUser:
+		case common.TypeNewConn:
 			go srpClient.HandleNewUserConn(data)
 		case common.TypeForwarding:
 			if srpClient.CIDMap[data.CID] == nil {
@@ -71,7 +71,7 @@ func main() {
 			logger.LogWithLevel(srpClient.LogLevel, 2, fmt.Sprintf("转发数据到srp-server，有效载荷大小：%dbyte", data.PayloadLen))
 			logger.LogWithLevel(srpClient.LogLevel, 3, "转发数据到srp-server：")
 			logger.LogWithLevel(srpClient.LogLevel, 3, data.String())
-		case common.TypeDisconnection:
+		case common.TypeDisconnect:
 			if conn, ok := srpClient.CIDMap[data.CID]; ok {
 				srpClient.RemoveUserConn(data.CID)
 				conn.Close()
