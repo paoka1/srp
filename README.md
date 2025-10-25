@@ -7,16 +7,16 @@ TCP反向代理
 Usage of server.exe:
   -client-port int
         srp-client连接的端口 (default 6000)
-  -debug
-        开启调试模式
+  -log-level int
+        日志级别（1-3） (default 1)
   -server-pwd string
         访问转发服务的密码 (default "default_password")
   -user-port int
         用户访问转发服务的端口 (default 9000)
         
 Usage of client.exe:
-  -debug
-        开启调试模式
+  -log-level int
+        日志级别（1-3） (default 1)
   -server-ip string
         srp-server的IP地址 (default "127.0.0.1")
   -server-port int
@@ -30,7 +30,7 @@ Usage of client.exe:
 ```
 
 #### 3.原理
-`service <---> srp-Server <---> srp-Client <---> User`
+`service <---> srp-server <---> srp-client <---> User`
 
 #### 4.构建
 
@@ -66,4 +66,4 @@ ssh ubuntu@192.168.12.1
 
 #### 6.关于
 
-该项目仍在完善中，不免存在bug。后续也许会支持更多协议
+该项目仍在完善中，不免存在bug，后续也许会支持更多协议
