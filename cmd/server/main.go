@@ -29,8 +29,8 @@ func main() {
 			LogLevel:       *logLevel,
 		},
 		ClientConn:      nil,
-		UIDNext:         1,
-		UserUIDMap:      make(map[uint32]net.Conn),
+		CIDNext:         1,
+		CIDMap:          make(map[uint32]net.Conn),
 		DataChan2User:   make(chan common.Proto, 100),
 		DataChan2Client: make(chan common.Proto, 100),
 		DataChan2Handle: make(chan common.Proto, 100),
@@ -43,7 +43,7 @@ func main() {
 	go srpServer.AcceptUserConn()
 
 	// 通过 DataChan2Client 接收 user 消息，发送到 srp-client
-	// 通过 DataChan2User 接收 srp-client 消息，根据 uid 发送到 user
+	// 通过 DataChan2User 接收 srp-client 消息，根据 cid 发送到 user
 	for {
 		select {
 		case data := <-srpServer.DataChan2Client:
@@ -68,17 +68,17 @@ func main() {
 			logger.LogWithLevel(srpServer.LogLevel, 3, data.String())
 		case data := <-srpServer.DataChan2User:
 			if data.Type == common.TypeDisconnection {
-				if conn, ok := srpServer.UserUIDMap[data.UID]; ok {
-					srpServer.RemoveUserConn(data.UID)
+				if conn, ok := srpServer.CIDMap[data.CID]; ok {
+					srpServer.RemoveUserConn(data.CID)
 					conn.Close()
-					logger.LogWithLevel(srpServer.LogLevel, 2, fmt.Sprintf("关闭user(uid：%d)的连接", data.UID))
+					logger.LogWithLevel(srpServer.LogLevel, 2, fmt.Sprintf("关闭user(cid：%d)的连接", data.CID))
 				}
 				continue
 			}
 
-			conn := srpServer.UserUIDMap[data.UID]
+			conn := srpServer.CIDMap[data.CID]
 			if conn == nil {
-				logger.LogWithLevel(srpServer.LogLevel, 2, fmt.Sprintf("丢弃srp-client发往user的数据包，无效的uid：%d", data.UID))
+				logger.LogWithLevel(srpServer.LogLevel, 2, fmt.Sprintf("丢弃srp-client发往user的数据包，无效的cid：%d", data.CID))
 				continue
 			}
 			if _, err := conn.Write(data.Payload); err != nil {

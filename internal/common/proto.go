@@ -45,16 +45,16 @@ var typeCodeMap = map[TypeCode]string{
 type Proto struct {
 	Code       StatusCode
 	Type       TypeCode
-	UID        uint32 // User UID
+	CID        uint32 // User CID
 	PayloadLen uint32 // Payload 长度
 	Payload    []byte
 }
 
-func NewProto(scode StatusCode, tcode TypeCode, uid uint32, payload []byte) Proto {
+func NewProto(scode StatusCode, tcode TypeCode, cid uint32, payload []byte) Proto {
 	return Proto{
 		Code:       scode,
 		Type:       tcode,
-		UID:        uid,
+		CID:        cid,
 		PayloadLen: uint32(len(payload)),
 		Payload:    payload,
 	}
@@ -71,8 +71,8 @@ func (p *Proto) EncodeProto() ([]byte, error) {
 		return nil, fmt.Errorf("编码Type失败: %w", err)
 	}
 
-	if err := binary.Write(buf, binary.BigEndian, p.UID); err != nil {
-		return nil, fmt.Errorf("编码UID失败: %w", err)
+	if err := binary.Write(buf, binary.BigEndian, p.CID); err != nil {
+		return nil, fmt.Errorf("编码cid失败: %w", err)
 	}
 
 	if err := binary.Write(buf, binary.BigEndian, p.PayloadLen); err != nil {
@@ -103,11 +103,11 @@ func (p *Proto) DecodeProto(reader *bufio.Reader) error {
 	}
 	p.Type = TypeCode(typeByte)
 
-	uidBytes := make([]byte, 4)
-	if _, err := io.ReadFull(reader, uidBytes); err != nil {
-		return fmt.Errorf("解码UID失败: %w", err)
+	cidBytes := make([]byte, 4)
+	if _, err := io.ReadFull(reader, cidBytes); err != nil {
+		return fmt.Errorf("解码cid失败: %w", err)
 	}
-	p.UID = binary.BigEndian.Uint32(uidBytes)
+	p.CID = binary.BigEndian.Uint32(cidBytes)
 
 	lenBytes := make([]byte, 4)
 	if _, err := io.ReadFull(reader, lenBytes); err != nil {
@@ -132,13 +132,13 @@ func (p *Proto) String() string {
 		"\nData{\n"+
 			"  Code:       %s\n"+
 			"  Type:       %s\n"+
-			"  UID:        %d\n"+
+			"  CID:        %d\n"+
 			"  PayloadLen: %d\n"+
 			"  Payload:    %s\n"+
 			"}",
 		statusCodeToString(p.Code),
 		typeCodeToString(p.Type),
-		p.UID,
+		p.CID,
 		p.PayloadLen,
 		bytesToHexString(p.Payload),
 	)

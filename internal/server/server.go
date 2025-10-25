@@ -23,9 +23,9 @@ type Config struct {
 type Server struct {
 	Config
 
-	UIDNext    uint32
+	CIDNext    uint32
 	ClientConn net.Conn
-	UserUIDMap map[uint32]net.Conn
+	CIDMap     map[uint32]net.Conn // Connection ID to Connection
 
 	DataChan2User   chan common.Proto // data channel to user
 	DataChan2Client chan common.Proto // data channel to client
@@ -34,16 +34,16 @@ type Server struct {
 	Mu *sync.Mutex
 }
 
-func (s *Server) AddUserConn(uid uint32, conn net.Conn) {
+func (s *Server) AddUserConn(cid uint32, conn net.Conn) {
 	s.Mu.Lock()
 	defer s.Mu.Unlock()
-	s.UserUIDMap[uid] = conn
+	s.CIDMap[cid] = conn
 }
 
-func (s *Server) RemoveUserConn(uid uint32) {
+func (s *Server) RemoveUserConn(cid uint32) {
 	s.Mu.Lock()
 	defer s.Mu.Unlock()
-	delete(s.UserUIDMap, uid)
+	delete(s.CIDMap, cid)
 }
 
 func (s *Server) CloseClientConn() {
@@ -66,22 +66,22 @@ func (s *Server) NewClientConn(conn net.Conn) error {
 	}
 }
 
-func (s *Server) GetNextUID() uint32 {
+func (s *Server) GetNextcid() uint32 {
 	s.Mu.Lock()
 	defer func() {
-		s.UIDNext++
+		s.CIDNext++
 		s.Mu.Unlock()
 	}()
-	return s.UIDNext
+	return s.CIDNext
 }
 
 func (s *Server) CloseAllUserConn() {
 	s.Mu.Lock()
 	defer s.Mu.Unlock()
-	for _, c := range s.UserUIDMap {
+	for _, c := range s.CIDMap {
 		c.Close()
 	}
-	s.UserUIDMap = make(map[uint32]net.Conn)
+	s.CIDMap = make(map[uint32]net.Conn)
 }
 
 func (s *Server) AcceptClient() {
@@ -199,8 +199,8 @@ func (s *Server) HandleUserConn(conn net.Conn) {
 	}
 
 	// 完成注册
-	uid := s.GetNextUID()
-	data := common.NewProto(common.CodeSuccess, common.TypeNewUser, uid, nil)
+	cid := s.GetNextcid()
+	data := common.NewProto(common.CodeSuccess, common.TypeNewUser, cid, nil)
 	dataByte, err := data.EncodeProto()
 	if err != nil {
 		logger.LogWithLevel(s.LogLevel, 2, "拒绝user："+conn.RemoteAddr().String()+"的连接，"+err.Error())
@@ -218,7 +218,7 @@ func (s *Server) HandleUserConn(conn net.Conn) {
 	// 验证 TypeAcceptUser
 	for {
 		data = <-s.DataChan2Handle
-		if data.UID != uid {
+		if data.CID != cid {
 			// 不是自己的就放进去
 			s.DataChan2Handle <- data
 			continue
@@ -235,8 +235,8 @@ func (s *Server) HandleUserConn(conn net.Conn) {
 	tcpConn := conn.(*net.TCPConn)
 	tcpConn.SetKeepAlive(true)
 
-	s.AddUserConn(uid, conn)
-	logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("建立连接(uid：%d)：%s->%s", uid, conn.LocalAddr().String(), conn.RemoteAddr().String()))
+	s.AddUserConn(cid, conn)
+	logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("建立连接(cid：%d)：%s->%s", cid, conn.LocalAddr().String(), conn.RemoteAddr().String()))
 
 	// 读取消息，放到 DataChan2Client
 	for {
@@ -248,18 +248,18 @@ func (s *Server) HandleUserConn(conn net.Conn) {
 			} else {
 				logger.LogWithLevel(s.LogLevel, 2, "user："+conn.RemoteAddr().String()+"断开连接，"+err.Error())
 			}
-			if _, ok := s.UserUIDMap[data.UID]; ok {
-				data = common.NewProto(common.CodeSuccess, common.TypeDisconnection, uid, []byte{})
+			if _, ok := s.CIDMap[data.CID]; ok {
+				data = common.NewProto(common.CodeSuccess, common.TypeDisconnection, cid, []byte{})
 				s.DataChan2Client <- data
-				s.RemoveUserConn(uid)
+				s.RemoveUserConn(cid)
 			}
 			return
 		}
 
 		// 只传输读取的所有数据，而不是原来的 dataByte
 		dataByte = dataByte[:byteLen]
-		// 打上 UID 标签
-		data = common.NewProto(common.CodeSuccess, common.TypeForwarding, uid, dataByte)
+		// 打上 CID 标签
+		data = common.NewProto(common.CodeSuccess, common.TypeForwarding, cid, dataByte)
 		s.DataChan2Client <- data
 	}
 }

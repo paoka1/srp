@@ -34,7 +34,7 @@ func main() {
 			LogLevel:       *logLevel,
 		},
 		ServerConn: nil,
-		UserUIDMap: make(map[uint32]net.Conn),
+		CIDMap:     make(map[uint32]net.Conn),
 		Mu:         &sync.Mutex{},
 	}
 
@@ -60,22 +60,22 @@ func main() {
 		case common.TypeNewUser:
 			go srpClient.HandleNewUserConn(data)
 		case common.TypeForwarding:
-			if srpClient.UserUIDMap[data.UID] == nil {
-				logger.LogWithLevel(srpClient.LogLevel, 2, "收到uid："+strconv.Itoa(int(data.UID))+"的数据，无匹配的uid")
+			if srpClient.CIDMap[data.CID] == nil {
+				logger.LogWithLevel(srpClient.LogLevel, 2, "收到cid："+strconv.Itoa(int(data.CID))+"的数据，无匹配的cid")
 				continue
 			}
-			if _, err := srpClient.UserUIDMap[data.UID].Write(data.Payload); err != nil {
-				logger.LogWithLevel(srpClient.LogLevel, 2, "收到uid："+strconv.Itoa(int(data.UID))+"的数据，无法转发到service，"+err.Error())
+			if _, err := srpClient.CIDMap[data.CID].Write(data.Payload); err != nil {
+				logger.LogWithLevel(srpClient.LogLevel, 2, "收到ucid："+strconv.Itoa(int(data.CID))+"的数据，无法转发到service，"+err.Error())
 			}
 
 			logger.LogWithLevel(srpClient.LogLevel, 2, fmt.Sprintf("转发数据到srp-server，有效载荷大小：%dbyte", data.PayloadLen))
 			logger.LogWithLevel(srpClient.LogLevel, 3, "转发数据到srp-server：")
 			logger.LogWithLevel(srpClient.LogLevel, 3, data.String())
 		case common.TypeDisconnection:
-			if conn, ok := srpClient.UserUIDMap[data.UID]; ok {
-				srpClient.RemoveUserConn(data.UID)
+			if conn, ok := srpClient.CIDMap[data.CID]; ok {
+				srpClient.RemoveUserConn(data.CID)
 				conn.Close()
-				logger.LogWithLevel(srpClient.LogLevel, 2, fmt.Sprintf("关闭uid：%d的连接", data.UID))
+				logger.LogWithLevel(srpClient.LogLevel, 2, fmt.Sprintf("关闭cid：%d的连接", data.CID))
 			}
 		}
 	}
