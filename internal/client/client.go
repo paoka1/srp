@@ -3,7 +3,6 @@ package client
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"srp/internal/common"
@@ -23,30 +22,32 @@ type Config struct {
 
 type Client struct {
 	Config
-	ServerConn net.Conn
-	CIDMap     map[uint32]net.Conn
-	Mu         *sync.Mutex
+
+	ServerConn    net.Conn
+	UserConnIDMap map[uint32]net.Conn // Map of User Connection ID to Connection
+
+	Mu *sync.Mutex
 }
 
 func (c *Client) AddUserConn(cid uint32, conn net.Conn) {
 	c.Mu.Lock()
 	defer c.Mu.Unlock()
-	c.CIDMap[cid] = conn
+	c.UserConnIDMap[cid] = conn
 }
 
 func (c *Client) RemoveUserConn(cid uint32) {
 	c.Mu.Lock()
 	defer c.Mu.Unlock()
-	delete(c.CIDMap, cid)
+	delete(c.UserConnIDMap, cid)
 }
 
 func (c *Client) CloseAllUserConn() {
 	c.Mu.Lock()
 	defer c.Mu.Unlock()
-	for _, m := range c.CIDMap {
+	for _, m := range c.UserConnIDMap {
 		m.Close()
 	}
-	c.CIDMap = make(map[uint32]net.Conn)
+	c.UserConnIDMap = make(map[uint32]net.Conn)
 }
 
 func (c *Client) EstablishConn() {
@@ -94,7 +95,7 @@ func (c *Client) HandleNewUserConn(data common.Proto) {
 	cid := data.CID
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", c.ServiceIP, c.ServicePort))
 	if err != nil {
-		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("拒绝连接(cid：%d)，无法创建本地套接字，%s", cid, err.Error()))
+		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("拒绝连接(cid：%d)，无法建立和服务(%s)的连接，%s", cid, conn.RemoteAddr(), err.Error()))
 		data = common.NewProto(common.CodeForbidden, common.TypeRejectConn, cid, []byte{})
 		isReject = true
 	} else {
@@ -123,7 +124,7 @@ func (c *Client) HandleNewUserConn(data common.Proto) {
 	tcpConn.SetKeepAlive(true)
 
 	c.AddUserConn(cid, conn)
-	logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("建立连接(cid：%d)：%s->%s", cid, conn.LocalAddr().String(), conn.RemoteAddr().String()))
+	logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("建立连接(cid：%d)：%s->%s", cid, conn.LocalAddr(), conn.RemoteAddr()))
 
 	// 阻塞在获取 service 消息处
 	// 获得消息后立刻包装发送
@@ -131,13 +132,9 @@ func (c *Client) HandleNewUserConn(data common.Proto) {
 		dataByte = make([]byte, common.MaxBufferSize)
 		byteLen, err := conn.Read(dataByte)
 		if err != nil {
-			if err == io.EOF {
-				logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("和连接(cid：%d)的本地连接(%s)的连接断开，%s", cid, conn.LocalAddr().String(), err.Error()))
-			} else {
-				logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("和连接(cid：%d)的本地连接(%s)的连接断开，%s", cid, conn.LocalAddr().String(), err.Error()))
-			}
+			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("用户连接(cid：%d)的服务连接(%s->%s)断开，%s", cid, conn.LocalAddr(), conn.RemoteAddr(), err.Error()))
 			data = common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte{})
-			if _, ok := c.CIDMap[data.CID]; ok {
+			if _, ok := c.UserConnIDMap[data.CID]; ok {
 				dataByteEncoded, _ := data.EncodeProto()
 				c.ServerConn.Write(dataByteEncoded)
 				c.RemoveUserConn(cid)
