@@ -9,6 +9,8 @@ Usage of server.exe:
         srp-client连接的端口 (default 6000)
   -log-level int
         日志级别（1-3） (default 1)
+  -protocol string
+        srp-client和转发服务间通信的协议，支持：tcp协议 (default "tcp")
   -server-pwd string
         访问转发服务的密码 (default "default_password")
   -user-port int
@@ -17,6 +19,8 @@ Usage of server.exe:
 Usage of client.exe:
   -log-level int
         日志级别（1-3） (default 1)
+  -protocol string
+        用户和srp-server间通信的协议，支持：tcp协议 (default "tcp")
   -server-ip string
         srp-server的IP地址 (default "127.0.0.1")
   -server-port int
