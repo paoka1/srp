@@ -5,10 +5,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"srp/internal/common"
 	"srp/internal/server"
 	"srp/pkg/logger"
+	"srp/pkg/utils"
 	"sync"
 )
 
@@ -18,15 +20,17 @@ func main() {
 	clientPort := flag.Int("client-port", 6000, "srp-client连接的端口")
 	userPort := flag.Int("user-port", 9000, "用户访问转发服务的端口")
 	serverPassword := flag.String("server-pwd", common.DefaultServerPasswd, "访问转发服务的密码")
+	protocol := flag.String("protocol", "tcp", "srp-client和转发服务间通信的协议，支持："+utils.Protocols2String(common.Protocols))
 	logLevel := flag.Int("log-level", 1, fmt.Sprintf("日志级别（1-%d）", logger.MaxLogLevel))
 	flag.Parse()
 
 	srpServer := server.Server{
 		Config: server.Config{
-			ClientPort:     *clientPort,
-			UserPort:       *userPort,
-			ServerPassword: *serverPassword,
-			LogLevel:       *logLevel,
+			ClientPort:      *clientPort,
+			UserPort:        *userPort,
+			ServerPassword:  *serverPassword,
+			ServiceProtocol: *protocol,
+			LogLevel:        *logLevel,
 		},
 		ClientConn:      nil,
 		CIDNext:         1,
@@ -35,6 +39,15 @@ func main() {
 		DataChan2Client: make(chan common.Proto, 100),
 		DataChan2Handle: make(chan common.Proto, 100),
 		Mu:              &sync.Mutex{},
+	}
+
+	// 根据命令行参数 protocol 选择协议
+	// 实现新的协议时，务必在此添加代码
+	switch srpServer.ServiceProtocol {
+	case "tcp":
+		srpServer.HandleNewConn = srpServer.HandleUserConnTCP
+	default:
+		log.Fatal("无效的协议：" + srpServer.ServiceProtocol)
 	}
 
 	go srpServer.AcceptClient()

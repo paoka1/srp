@@ -14,21 +14,29 @@ import (
 )
 
 type Config struct {
-	ServerIP       string // srp-server ip
-	ServerPort     int    // srp-server port
-	ServiceIP      string // service ip
-	ServicePort    int    // service port
+	ServerIP   string // srp-server ip
+	ServerPort int    // srp-server port
+
+	ServiceIP   string // service ip
+	ServicePort int    // service port
+
 	ServerPassword string
-	LogLevel       int
+	ServerProtocol string // 和 srp-server 通信的协议
+
+	LogLevel int
 }
 
 type Client struct {
 	Config
 
 	ServerConn    net.Conn
-	UserConnIDMap map[uint32]net.Conn // Map of User Connection ID to Connection
+	UserConnIDMap map[uint32]net.Conn // map of User Connection ID to Connection
 
 	Mu *sync.Mutex
+
+	// 处理 SRP 客户端与服务之间连接的函数
+	// 在运行时动态根据命令行参数被赋值
+	HandleNewConn func(data common.Proto)
 }
 
 func (c *Client) AddUserConn(cid uint32, conn net.Conn) {
@@ -102,7 +110,7 @@ func (c *Client) EstablishConn() {
 	logger.LogWithLevel(c.LogLevel, 1, "成功与srp-server建立连接")
 }
 
-func (c *Client) HandleNewUserConn(data common.Proto) {
+func (c *Client) HandleNewConnTCP(data common.Proto) {
 	var isReject bool
 
 	// 获得 CID

@@ -14,10 +14,13 @@ import (
 )
 
 type Config struct {
-	ClientPort     int // srp-client port
-	UserPort       int // user port
-	ServerPassword string
-	LogLevel       int
+	ClientPort int // srp-client port
+	UserPort   int // user port
+
+	ServerPassword  string
+	ServiceProtocol string // 和服务通信的协议
+
+	LogLevel int
 }
 
 type Server struct {
@@ -25,13 +28,17 @@ type Server struct {
 
 	CIDNext       uint32
 	ClientConn    net.Conn
-	UserConnIDMap map[uint32]net.Conn // Map of User Connection ID to Connection
+	UserConnIDMap map[uint32]net.Conn // map of User Connection ID to Connection
 
 	DataChan2User   chan common.Proto // data channel to user
 	DataChan2Client chan common.Proto // data channel to client
 	DataChan2Handle chan common.Proto // data channel to handle
 
 	Mu *sync.Mutex
+
+	// 处理 SRP 客户端与服务之间连接的函数
+	// 在运行时动态根据命令行参数被赋值
+	HandleNewConn func(conn net.Conn)
 }
 
 func (s *Server) AddUserConn(cid uint32, conn net.Conn) {
@@ -168,12 +175,12 @@ func (s *Server) AcceptUserConn() {
 			logger.LogWithLevel(s.LogLevel, 2, "拒绝user："+conn.RemoteAddr().String()+" 的连接，"+err.Error())
 			continue
 		}
-		go s.HandleUserConn(conn)
+		go s.HandleUserConnTCP(conn)
 	}
 }
 
-// HandleUserConn 完成连接创建和接收数据
-func (s *Server) HandleUserConn(conn net.Conn) {
+// HandleUserConnTCP 完成连接创建和接收数据
+func (s *Server) HandleUserConnTCP(conn net.Conn) {
 	if s.ClientConn == nil {
 		conn.Close()
 		logger.LogWithLevel(s.LogLevel, 2, "srp-client连接为空，拒绝user："+conn.RemoteAddr().String()+"的连接")

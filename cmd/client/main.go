@@ -9,6 +9,7 @@ import (
 	"srp/internal/client"
 	"srp/internal/common"
 	"srp/pkg/logger"
+	"srp/pkg/utils"
 	"strconv"
 	"sync"
 )
@@ -21,6 +22,7 @@ func main() {
 	serviceIP := flag.String("service-ip", "127.0.0.1", "被转发服务的IP地址")
 	servicePort := flag.Int("service-port", 3000, "被转发服务的端口")
 	serverPassword := flag.String("server-pwd", common.DefaultServerPasswd, "连接srp-server的密码")
+	protocol := flag.String("protocol", "tcp", "用户和srp-server间通信的协议，支持："+utils.Protocols2String(common.Protocols))
 	logLevel := flag.Int("log-level", 1, fmt.Sprintf("日志级别（1-%d）", logger.MaxLogLevel))
 	flag.Parse()
 
@@ -31,11 +33,21 @@ func main() {
 			ServiceIP:      *serviceIP,
 			ServicePort:    *servicePort,
 			ServerPassword: *serverPassword,
+			ServerProtocol: *protocol,
 			LogLevel:       *logLevel,
 		},
 		ServerConn:    nil,
 		UserConnIDMap: make(map[uint32]net.Conn),
 		Mu:            &sync.Mutex{},
+	}
+
+	// 根据命令行参数 protocol 选择协议
+	// 实现新的协议时，务必在此添加代码
+	switch srpClient.ServerProtocol {
+	case "tcp":
+		srpClient.HandleNewConn = srpClient.HandleNewConnTCP
+	default:
+		log.Fatal("无效的协议：" + srpClient.ServerProtocol)
 	}
 
 	srpClient.EstablishConn()
@@ -46,7 +58,7 @@ func main() {
 	}()
 
 	// 阻塞在接收 srp-server 的消息处
-	// 1.取出消息，若为新的 user conn，调用 HandleNewUserConn
+	// 1.取出消息，若为新的 user conn，调用 HandleNewConnTCP
 	// 2.若为转发的流量，则转发到对应的 user conn
 	data := common.Proto{}
 	reader := bufio.NewReader(srpClient.ServerConn)
@@ -58,7 +70,7 @@ func main() {
 
 		switch data.Type {
 		case common.TypeNewConn:
-			go srpClient.HandleNewUserConn(data)
+			go srpClient.HandleNewConn(data)
 		case common.TypeForwarding:
 			if srpClient.UserConnIDMap[data.CID] == nil {
 				logger.LogWithLevel(srpClient.LogLevel, 2, "收到cid："+strconv.Itoa(int(data.CID))+"的数据，无匹配的cid")
