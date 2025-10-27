@@ -14,6 +14,9 @@ import (
 )
 
 type Config struct {
+	ClientIP string // srp-client ip
+	UserIP   string // user ip
+
 	ClientPort int // srp-client port
 	UserPort   int // user port
 
@@ -81,7 +84,7 @@ func (s *Server) CloseAllUserConn() {
 }
 
 func (s *Server) AcceptClient() {
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", s.ClientPort))
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", s.ClientIP, s.ClientPort))
 	if err != nil {
 		log.Fatal("无法创建tcp监听，" + err.Error())
 	}
@@ -165,7 +168,7 @@ func (s *Server) HandleClient(conn net.Conn) {
 }
 
 func (s *Server) AcceptUserConn() {
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", s.UserPort))
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", s.UserIP, s.UserPort))
 	if err != nil {
 		log.Fatal("无法监听tcp连接，" + err.Error())
 	}

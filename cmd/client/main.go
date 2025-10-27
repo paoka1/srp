@@ -18,12 +18,12 @@ func main() {
 	logger.SetLogFormat()
 
 	serverIP := flag.String("server-ip", "127.0.0.1", "srp-server的IP地址")
-	serverPort := flag.Int("server-port", 6000, "srp-server监听的端口")
+	serverPort := flag.Int("server-port", 6352, "srp-server监听的端口")
 	serviceIP := flag.String("service-ip", "127.0.0.1", "被转发服务的IP地址")
-	servicePort := flag.Int("service-port", 3000, "被转发服务的端口")
+	servicePort := flag.Int("service-port", 80, "被转发服务的端口")
 	serverPassword := flag.String("server-pwd", common.DefaultServerPasswd, "连接srp-server的密码")
 	protocol := flag.String("protocol", "tcp", "用户和srp-server间通信的协议，支持："+utils.Protocols2String(common.Protocols))
-	logLevel := flag.Int("log-level", 1, fmt.Sprintf("日志级别（1-%d）", logger.MaxLogLevel))
+	logLevel := flag.Int("log-level", 2, fmt.Sprintf("日志级别（1-%d）", logger.MaxLogLevel))
 	flag.Parse()
 
 	srpClient := client.Client{
@@ -49,6 +49,9 @@ func main() {
 	default:
 		log.Fatal("无效的协议：" + srpClient.ServerProtocol)
 	}
+
+	logger.LogWithLevel(srpClient.LogLevel, 1, fmt.Sprintf("服务地址: %s:%d", srpClient.ServiceIP, srpClient.ServicePort))
+	logger.LogWithLevel(srpClient.LogLevel, 1, fmt.Sprintf("srp-server地址: %s:%d", srpClient.ServerIP, srpClient.ServerPort))
 
 	srpClient.EstablishConn()
 	defer func() {
