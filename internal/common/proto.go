@@ -9,15 +9,15 @@ import (
 	"strings"
 )
 
-type StatusCode uint8
-type TypeCode uint8
+type (
+	StatusCode uint8 // 状态码
+	TypeCode   uint8 // 数据类型
+)
 
 const (
 	CodeSuccess   StatusCode = 1 // 操作成功
 	CodeForbidden StatusCode = 2 // 操作不允许
-)
 
-const (
 	TypePing       TypeCode = 1 // srp-client 验证
 	TypePong       TypeCode = 2 // srp-server 响应
 	TypeNewConn    TypeCode = 3 // 新的连接
@@ -26,21 +26,6 @@ const (
 	TypeForwarding TypeCode = 6 // 数据转发
 	TypeDisconnect TypeCode = 7 // 断开连接
 )
-
-var statusCodeMap = map[StatusCode]string{
-	CodeSuccess:   "CodeSuccess",
-	CodeForbidden: "CodeForbidden",
-}
-
-var typeCodeMap = map[TypeCode]string{
-	TypePing:       "TypePing",
-	TypePong:       "TypePong",
-	TypeNewConn:    "TypeNewConn",
-	TypeAcceptConn: "TypeAcceptConn",
-	TypeRejectConn: "TypeRejectConn",
-	TypeForwarding: "TypeForwarding",
-	TypeDisconnect: "TypeDisconnect",
-}
 
 // Proto 为 srp-client 和 srp-server 之间的网络协议
 // 基于 TCP 协议设计，包含：状态、类型、连接序号、有效载荷长度和有效载荷字段
@@ -52,16 +37,7 @@ type Proto struct {
 	Payload    []byte
 }
 
-func NewProto(scode StatusCode, tcode TypeCode, cid uint32, payload []byte) Proto {
-	return Proto{
-		Code:       scode,
-		Type:       tcode,
-		CID:        cid,
-		PayloadLen: uint32(len(payload)),
-		Payload:    payload,
-	}
-}
-
+// EncodeProto 转换协议结构体为字节数组
 func (p *Proto) EncodeProto() ([]byte, error) {
 	buf := new(bytes.Buffer)
 
@@ -91,6 +67,7 @@ func (p *Proto) EncodeProto() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// DecodeProto 转换字节数组为协议结构体
 func (p *Proto) DecodeProto(reader *bufio.Reader) error {
 	// code 和 type 都是 uint8，直接读取 byte 即可
 	codeByte, err := reader.ReadByte()
@@ -144,6 +121,32 @@ func (p *Proto) String() string {
 		p.PayloadLen,
 		bytesToHexString(p.Payload),
 	)
+}
+
+// NewProto 返回新的协议结构体
+func NewProto(scode StatusCode, tcode TypeCode, cid uint32, payload []byte) Proto {
+	return Proto{
+		Code:       scode,
+		Type:       tcode,
+		CID:        cid,
+		PayloadLen: uint32(len(payload)),
+		Payload:    payload,
+	}
+}
+
+var statusCodeMap = map[StatusCode]string{
+	CodeSuccess:   "CodeSuccess",
+	CodeForbidden: "CodeForbidden",
+}
+
+var typeCodeMap = map[TypeCode]string{
+	TypePing:       "TypePing",
+	TypePong:       "TypePong",
+	TypeNewConn:    "TypeNewConn",
+	TypeAcceptConn: "TypeAcceptConn",
+	TypeRejectConn: "TypeRejectConn",
+	TypeForwarding: "TypeForwarding",
+	TypeDisconnect: "TypeDisconnect",
 }
 
 // 辅助函数：将 StatusCode 转换为可读字符串
