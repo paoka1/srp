@@ -21,7 +21,7 @@ type Config struct {
 	UserPort   int // user port
 
 	ServerPassword  string
-	ServiceProtocol string // 和服务通信的协议
+	ServiceProtocol string // 和服务通信的协议，也为和 srp-server 通信的协议
 
 	LogLevel int
 }
@@ -168,9 +168,9 @@ func (s *Server) HandleClient(conn net.Conn) {
 }
 
 func (s *Server) AcceptUserConn() {
-	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", s.UserIP, s.UserPort))
+	listener, err := net.Listen(s.ServiceProtocol, fmt.Sprintf("%s:%d", s.UserIP, s.UserPort))
 	if err != nil {
-		log.Fatal("无法监听tcp连接，" + err.Error())
+		log.Fatal("无法监听" + s.ServiceProtocol + "连接，" + err.Error())
 	}
 	for {
 		conn, err := listener.Accept()
@@ -178,7 +178,7 @@ func (s *Server) AcceptUserConn() {
 			logger.LogWithLevel(s.LogLevel, 2, "拒绝user："+conn.RemoteAddr().String()+" 的连接，"+err.Error())
 			continue
 		}
-		go s.HandleUserConnTCP(conn)
+		go s.HandleNewConn(conn)
 	}
 }
 
