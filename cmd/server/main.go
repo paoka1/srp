@@ -23,7 +23,6 @@ func main() {
 	userPort := flag.Int("user-port", 9352, "用户访问转发服务的端口")
 	serverPassword := flag.String("server-pwd", common.DefaultServerPasswd, "访问转发服务的密码")
 	protocol := flag.String("protocol", "tcp", "srp-client和转发服务间通信的协议，支持："+utils.Protocols2String(common.Protocols))
-
 	logLevel := flag.Int("log-level", 2, fmt.Sprintf("日志级别（1-%d）", logger.MaxLogLevel))
 	flag.Parse()
 
@@ -51,6 +50,7 @@ func main() {
 	switch srpServer.ServiceProtocol {
 	case "tcp":
 		srpServer.HandleNewConn = srpServer.HandleUserConnTCP
+		srpServer.AcceptUserConn = srpServer.AcceptUserConnTCP
 	default:
 		log.Fatal("无效的协议：" + srpServer.ServiceProtocol)
 	}
@@ -83,7 +83,6 @@ func main() {
 					srpServer.CloseAllUserConn()
 				}
 			}
-
 			logger.LogWithLevel(srpServer.LogLevel, 2, fmt.Sprintf("转发数据到srp-client，有效载荷大小：%dbyte", data.PayloadLen))
 			logger.LogWithLevel(srpServer.LogLevel, 3, "转发数据到srp-client：")
 			logger.LogWithLevel(srpServer.LogLevel, 3, data.String())
@@ -96,7 +95,6 @@ func main() {
 				}
 				continue
 			}
-
 			conn := srpServer.UserConnIDMap[data.CID]
 			if conn == nil {
 				logger.LogWithLevel(srpServer.LogLevel, 2, fmt.Sprintf("丢弃srp-client发往user的数据包，无效的cid：%d", data.CID))
@@ -106,7 +104,6 @@ func main() {
 				logger.LogWithLevel(srpServer.LogLevel, 2, "丢弃srp-client发往user的数据包，无法发送数据，"+err.Error())
 				continue
 			}
-
 			logger.LogWithLevel(srpServer.LogLevel, 2, fmt.Sprintf("转发数据到user，有效载荷大小：%dbyte", data.PayloadLen))
 			logger.LogWithLevel(srpServer.LogLevel, 3, "转发数据到user：")
 			logger.LogWithLevel(srpServer.LogLevel, 3, data.String())

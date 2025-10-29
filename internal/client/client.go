@@ -110,6 +110,7 @@ func (c *Client) EstablishConn() {
 	logger.LogWithLevel(c.LogLevel, 1, "成功与srp-server建立连接")
 }
 
+// HandleNewConnTCP 处理 TCP 数据
 func (c *Client) HandleNewConnTCP(data common.Proto) {
 	var isReject bool
 
@@ -183,4 +184,9 @@ func (c *Client) HandleNewConnTCP(data common.Proto) {
 			return
 		}
 	}
+}
+
+// HandleNewConnUDP 处理 UDP 数据
+func (c *Client) HandleNewConnUDP(data common.Proto) {
+
 }

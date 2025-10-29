@@ -49,7 +49,6 @@ func main() {
 	default:
 		log.Fatal("无效的协议：" + srpClient.ServerProtocol)
 	}
-
 	logger.LogWithLevel(srpClient.LogLevel, 1, fmt.Sprintf("服务地址: %s:%d", srpClient.ServiceIP, srpClient.ServicePort))
 	logger.LogWithLevel(srpClient.LogLevel, 1, fmt.Sprintf("srp-server地址: %s:%d", srpClient.ServerIP, srpClient.ServerPort))
 
@@ -82,7 +81,6 @@ func main() {
 			if _, err := srpClient.UserConnIDMap[data.CID].Write(data.Payload); err != nil {
 				logger.LogWithLevel(srpClient.LogLevel, 2, "收到cid："+strconv.Itoa(int(data.CID))+"的数据，无法转发到service，"+err.Error())
 			}
-
 			logger.LogWithLevel(srpClient.LogLevel, 2, fmt.Sprintf("转发数据到srp-server，有效载荷大小：%dbyte", data.PayloadLen))
 			logger.LogWithLevel(srpClient.LogLevel, 3, "转发数据到srp-server：")
 			logger.LogWithLevel(srpClient.LogLevel, 3, data.String())

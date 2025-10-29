@@ -41,7 +41,8 @@ type Server struct {
 
 	// 处理 SRP 客户端与服务之间连接的函数
 	// 在运行时动态根据命令行参数被赋值
-	HandleNewConn func(conn net.Conn)
+	HandleNewConn  func(conn net.Conn)
+	AcceptUserConn func()
 }
 
 func (s *Server) AddUserConn(cid uint32, conn net.Conn) {
@@ -167,10 +168,11 @@ func (s *Server) HandleClient(conn net.Conn) {
 	}
 }
 
-func (s *Server) AcceptUserConn() {
-	listener, err := net.Listen(s.ServiceProtocol, fmt.Sprintf("%s:%d", s.UserIP, s.UserPort))
+// AcceptUserConnTCP 监听和接受 TCP 连接
+func (s *Server) AcceptUserConnTCP() {
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", s.UserIP, s.UserPort))
 	if err != nil {
-		log.Fatal("无法监听" + s.ServiceProtocol + "连接，" + err.Error())
+		log.Fatal("无法监听tcp连接，" + err.Error())
 	}
 	for {
 		conn, err := listener.Accept()
@@ -182,7 +184,7 @@ func (s *Server) AcceptUserConn() {
 	}
 }
 
-// HandleUserConnTCP 完成连接创建和接收数据
+// HandleUserConnTCP 完成 TCP 连接创建和接收数据
 func (s *Server) HandleUserConnTCP(conn net.Conn) {
 	if s.ClientConn == nil {
 		conn.Close()
@@ -254,4 +256,14 @@ func (s *Server) HandleUserConnTCP(conn net.Conn) {
 		data = common.NewProto(common.CodeSuccess, common.TypeForwarding, cid, dataByte)
 		s.DataChan2Client <- data
 	}
+}
+
+// AcceptUserConnUDP 监听和接受 UDP 连接
+func (s *Server) AcceptUserConnUDP() {
+
+}
+
+// HandleUserConnUDP 完成 UDP 连接创建和接收数据
+func (s *Server) HandleUserConnUDP(conn net.Conn) {
+
 }
