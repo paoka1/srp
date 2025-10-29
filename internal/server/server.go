@@ -261,7 +261,28 @@ func (s *Server) HandleUserConnTCP(values ...interface{}) {
 
 // AcceptUserConnUDP 监听和接受 UDP 连接
 func (s *Server) AcceptUserConnUDP() {
+	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", s.UserIP, s.UserPort))
+	if err != nil {
+		log.Fatal("无法解析udp地址：" + addr.String() + err.Error())
+	}
+	conn, err := net.ListenUDP("udp", addr)
+	if err != nil {
+		log.Fatal("无法监听udp地址：" + addr.String() + err.Error())
+	}
+	defer conn.Close()
 
+	dataByte := make([]byte, common.MaxBufferSize)
+	for {
+		n, clientAddr, err := conn.ReadFromUDP(dataByte)
+		if err != nil {
+			logger.LogWithLevel(s.LogLevel, 2, "读取udp数据失败："+err.Error())
+			continue
+		}
+		// 拷贝数据，避免被下一次循环覆盖
+		data := make([]byte, n)
+		copy(data, dataByte[:n])
+		go s.HandleUserConnUDP(conn, clientAddr, data)
+	}
 }
 
 // HandleUserConnUDP 完成 UDP 连接创建和接收数据
