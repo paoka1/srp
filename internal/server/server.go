@@ -41,7 +41,7 @@ type Server struct {
 
 	// 处理 SRP 客户端与服务之间连接的函数
 	// 在运行时动态根据命令行参数被赋值
-	HandleNewConn  func(conn net.Conn)
+	HandleNewConn  func(i interface{})
 	AcceptUserConn func()
 }
 
@@ -185,7 +185,8 @@ func (s *Server) AcceptUserConnTCP() {
 }
 
 // HandleUserConnTCP 完成 TCP 连接创建和接收数据
-func (s *Server) HandleUserConnTCP(conn net.Conn) {
+func (s *Server) HandleUserConnTCP(i interface{}) {
+	conn, _ := i.(net.Conn)
 	if s.ClientConn == nil {
 		conn.Close()
 		logger.LogWithLevel(s.LogLevel, 2, "srp-client连接为空，拒绝user："+conn.RemoteAddr().String()+"的连接")
@@ -264,6 +265,6 @@ func (s *Server) AcceptUserConnUDP() {
 }
 
 // HandleUserConnUDP 完成 UDP 连接创建和接收数据
-func (s *Server) HandleUserConnUDP(conn net.Conn) {
+func (s *Server) HandleUserConnUDP(conn interface{}) {
 
 }
