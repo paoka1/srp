@@ -201,13 +201,13 @@ func (s *Server) HandleUserConnTCP(values ...interface{}) {
 	data := common.NewProto(common.CodeSuccess, common.TypeNewConn, cid, nil)
 	dataByte, err := data.EncodeProto()
 	if err != nil {
-		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝user：%s的连接，%s", conn.RemoteAddr(), err.Error()))
+		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝user：%s的连接，无法构造数据，%s", conn.RemoteAddr(), err.Error()))
 		conn.Close()
 		return
 	}
 
 	if _, err = s.ClientConn.Write(dataByte); err != nil {
-		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝user：%s的连接，%s", conn.RemoteAddr(), err.Error()))
+		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝user：%s的连接，无法向srp-client发送数据，%s", conn.RemoteAddr(), err.Error()))
 		conn.Close()
 		return
 	}

@@ -177,14 +177,12 @@ func (c *Client) HandleServerDataTCP(data common.Proto) {
 		dataByteEncoded, err := data.EncodeProto()
 		if err != nil {
 			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法处理用户连接(cid：%d)的服务响应数据：%s", cid, err.Error()))
-			c.CloseUserConn(cid)
-			return
+			continue
 		}
 
 		if _, err = c.ServerConn.Write(dataByteEncoded); err != nil {
 			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向srp-server发送用户连接(cid: %d)的服务响应数据：%s", cid, err.Error()))
-			c.CloseUserConn(cid)
-			return
+			continue
 		}
 	}
 }
