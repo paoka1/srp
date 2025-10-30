@@ -45,14 +45,14 @@ func main() {
 	// 实现新的协议时，务必在此添加代码
 	switch srpClient.ServerProtocol {
 	case "tcp":
-		srpClient.HandleNewConn = srpClient.HandleNewConnTCP
+		srpClient.HandleServerData = srpClient.HandleServerDataTCP
 	default:
 		log.Fatal("无效的协议：" + srpClient.ServerProtocol)
 	}
 	logger.LogWithLevel(srpClient.LogLevel, 1, fmt.Sprintf("服务地址: %s:%d", srpClient.ServiceIP, srpClient.ServicePort))
 	logger.LogWithLevel(srpClient.LogLevel, 1, fmt.Sprintf("srp-server地址: %s:%d", srpClient.ServerIP, srpClient.ServerPort))
 
-	srpClient.EstablishConn()
+	srpClient.EstablishServerConn()
 	defer func() {
 		if srpClient.ServerConn != nil {
 			srpClient.ServerConn.Close()
@@ -60,19 +60,19 @@ func main() {
 	}()
 
 	// 阻塞在接收 srp-server 的消息处
-	// 1.取出消息，若为新的 user conn，调用 HandleNewConnTCP
-	// 2.若为转发的流量，则转发到对应的 user conn
+	// 1.取出消息，若为新的用户连接，调用则向服务发送数据并处理连接
+	// 2.若为转发的流量，则转发到对应的连接
 	data := common.Proto{}
 	reader := bufio.NewReader(srpClient.ServerConn)
 	for {
 		if err := data.DecodeProto(reader); err != nil {
-			srpClient.CloseAllUserConn()
+			srpClient.CloseAllServiceConn()
 			log.Fatal("处理srp-server的数据失败：" + err.Error())
 		}
 
 		switch data.Type {
 		case common.TypeNewConn:
-			go srpClient.HandleNewConn(data)
+			go srpClient.HandleServerData(data)
 		case common.TypeForwarding:
 			if srpClient.UserConnIDMap[data.CID] == nil {
 				logger.LogWithLevel(srpClient.LogLevel, 2, "收到cid："+strconv.Itoa(int(data.CID))+"的数据，无匹配的cid")

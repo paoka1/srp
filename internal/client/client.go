@@ -21,7 +21,7 @@ type Config struct {
 	ServicePort int    // service port
 
 	ServerPassword string
-	ServerProtocol string // 和 srp-server 通信的协议
+	ServerProtocol string // 用户和 srp-server 通信的协议，也为 srp-client 和 service 的通信协议
 
 	LogLevel int
 }
@@ -36,7 +36,7 @@ type Client struct {
 
 	// 处理 SRP 客户端与服务之间连接的函数
 	// 在运行时动态根据命令行参数被赋值
-	HandleNewConn func(data common.Proto)
+	HandleServerData func(data common.Proto)
 }
 
 func (c *Client) AddUserConn(cid uint32, conn net.Conn) {
@@ -51,7 +51,7 @@ func (c *Client) RemoveUserConn(cid uint32) {
 	delete(c.UserConnIDMap, cid)
 }
 
-func (c *Client) CloseAllUserConn() {
+func (c *Client) CloseAllServiceConn() {
 	c.Mu.Lock()
 	defer c.Mu.Unlock()
 	for _, m := range c.UserConnIDMap {
@@ -60,7 +60,7 @@ func (c *Client) CloseAllUserConn() {
 	c.UserConnIDMap = make(map[uint32]net.Conn)
 }
 
-func (c *Client) EstablishConn() {
+func (c *Client) EstablishServerConn() {
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", c.ServerIP, c.ServerPort))
 	if err != nil {
 		log.Fatal("与srp-server建立连接失败，" + err.Error())
@@ -110,8 +110,8 @@ func (c *Client) EstablishConn() {
 	logger.LogWithLevel(c.LogLevel, 1, "成功与srp-server建立连接")
 }
 
-// HandleNewConnTCP 处理 TCP 数据
-func (c *Client) HandleNewConnTCP(data common.Proto) {
+// HandleServerDataTCP 处理 TCP 数据
+func (c *Client) HandleServerDataTCP(data common.Proto) {
 	var isReject bool
 
 	// 获得 CID
@@ -186,7 +186,7 @@ func (c *Client) HandleNewConnTCP(data common.Proto) {
 	}
 }
 
-// HandleNewConnUDP 处理 UDP 数据
-func (c *Client) HandleNewConnUDP(data common.Proto) {
+// HandleServerDataUDP 处理 UDP 数据
+func (c *Client) HandleServerDataUDP(data common.Proto) {
 
 }
