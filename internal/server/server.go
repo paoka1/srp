@@ -2,9 +2,7 @@ package server
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"srp/internal/common"
@@ -49,6 +47,12 @@ func (s *Server) AddUserConn(cid uint32, conn net.Conn) {
 	s.Mu.Lock()
 	defer s.Mu.Unlock()
 	s.UserConnIDMap[cid] = conn
+}
+
+func (s *Server) GetUserConn(cid uint32) net.Conn {
+	s.Mu.Lock()
+	defer s.Mu.Unlock()
+	return s.UserConnIDMap[cid]
 }
 
 func (s *Server) CloseUserConn(cid uint32) {
@@ -154,11 +158,7 @@ func (s *Server) HandleClient(conn net.Conn) {
 	// 接收来自 srp-client 的消息，放到 DataChan2User
 	for {
 		if err = data.DecodeProto(reader); err != nil {
-			if errors.Is(err, io.EOF) {
-				logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("srp-client：%s断开连接，%s", conn.RemoteAddr(), err.Error()))
-			} else {
-				logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("读取srp-client：%s的数据失败，%s", conn.RemoteAddr(), err.Error()))
-			}
+			logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("与srp-client：%s的连接断开，%s", conn.RemoteAddr(), err.Error()))
 			s.CloseClientConn()
 			s.CloseAllUserConn()
 			return

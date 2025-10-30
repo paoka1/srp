@@ -44,6 +44,12 @@ func (c *Client) AddUserConn(cid uint32, conn net.Conn) {
 	c.UserConnIDMap[cid] = conn
 }
 
+func (c *Client) GetUserConn(cid uint32) net.Conn {
+	c.Mu.Lock()
+	defer c.Mu.Unlock()
+	return c.UserConnIDMap[cid]
+}
+
 func (c *Client) CloseUserConn(cid uint32) {
 	c.Mu.Lock()
 	defer c.Mu.Unlock()

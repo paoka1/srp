@@ -92,7 +92,7 @@ func main() {
 				logger.LogWithLevel(srpServer.LogLevel, 2, fmt.Sprintf("关闭user(cid：%d)的连接", data.CID))
 				continue
 			}
-			conn := srpServer.UserConnIDMap[data.CID]
+			conn := srpServer.GetUserConn(data.CID)
 			if conn == nil {
 				logger.LogWithLevel(srpServer.LogLevel, 2, fmt.Sprintf("丢弃srp-client发往user的数据包，无效的cid：%d", data.CID))
 				continue

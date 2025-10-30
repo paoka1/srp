@@ -73,11 +73,12 @@ func main() {
 		case common.TypeNewConn:
 			go srpClient.HandleServerData(data)
 		case common.TypeForwarding:
-			if srpClient.UserConnIDMap[data.CID] == nil {
+			conn := srpClient.GetUserConn(data.CID)
+			if conn == nil {
 				logger.LogWithLevel(srpClient.LogLevel, 2, fmt.Sprintf("无匹配的cid：%d", data.CID))
 				continue
 			}
-			if _, err := srpClient.UserConnIDMap[data.CID].Write(data.Payload); err != nil {
+			if _, err := conn.Write(data.Payload); err != nil {
 				logger.LogWithLevel(srpClient.LogLevel, 2, fmt.Sprintf("无法转发cid：%d的数据到服务：%s", data.CID, err.Error()))
 			}
 			logger.LogWithLevel(srpClient.LogLevel, 2, fmt.Sprintf("转发数据到srp-server，有效载荷大小：%dbyte", data.PayloadLen))
