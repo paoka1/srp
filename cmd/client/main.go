@@ -10,7 +10,6 @@ import (
 	"srp/internal/common"
 	"srp/pkg/logger"
 	"srp/pkg/utils"
-	"strconv"
 	"sync"
 )
 
@@ -22,7 +21,7 @@ func main() {
 	serviceIP := flag.String("service-ip", "127.0.0.1", "被转发服务的IP地址")
 	servicePort := flag.Int("service-port", 80, "被转发服务的端口")
 	serverPassword := flag.String("server-pwd", common.DefaultServerPasswd, "连接srp-server的密码")
-	protocol := flag.String("protocol", "tcp", "用户和srp-server间通信的协议，支持："+utils.Protocols2String(common.Protocols))
+	protocol := flag.String("protocol", "tcp", "srp-client和被转发服务的通信协议，支持："+utils.Protocols2String(common.Protocols))
 	logLevel := flag.Int("log-level", 2, fmt.Sprintf("日志级别（1-%d）", logger.MaxLogLevel))
 	flag.Parse()
 
@@ -47,9 +46,9 @@ func main() {
 	case "tcp":
 		srpClient.HandleServerData = srpClient.HandleServerDataTCP
 	default:
-		log.Fatal("无效的协议：" + srpClient.ServerProtocol)
+		log.Fatal("不支持的协议：" + srpClient.ServerProtocol)
 	}
-	logger.LogWithLevel(srpClient.LogLevel, 1, fmt.Sprintf("服务地址: %s:%d", srpClient.ServiceIP, srpClient.ServicePort))
+	logger.LogWithLevel(srpClient.LogLevel, 1, fmt.Sprintf("被转发服务地址: %s:%d", srpClient.ServiceIP, srpClient.ServicePort))
 	logger.LogWithLevel(srpClient.LogLevel, 1, fmt.Sprintf("srp-server地址: %s:%d", srpClient.ServerIP, srpClient.ServerPort))
 
 	srpClient.EstablishServerConn()
@@ -67,7 +66,7 @@ func main() {
 	for {
 		if err := data.DecodeProto(reader); err != nil {
 			srpClient.CloseAllServiceConn()
-			log.Fatal("处理srp-server的数据失败：" + err.Error())
+			log.Fatal("无法处理srp-server的数据：" + err.Error())
 		}
 
 		switch data.Type {
@@ -75,21 +74,18 @@ func main() {
 			go srpClient.HandleServerData(data)
 		case common.TypeForwarding:
 			if srpClient.UserConnIDMap[data.CID] == nil {
-				logger.LogWithLevel(srpClient.LogLevel, 2, "收到cid："+strconv.Itoa(int(data.CID))+"的数据，无匹配的cid")
+				logger.LogWithLevel(srpClient.LogLevel, 2, fmt.Sprintf("无匹配的cid：%d", data.CID))
 				continue
 			}
 			if _, err := srpClient.UserConnIDMap[data.CID].Write(data.Payload); err != nil {
-				logger.LogWithLevel(srpClient.LogLevel, 2, "收到cid："+strconv.Itoa(int(data.CID))+"的数据，无法转发到service，"+err.Error())
+				logger.LogWithLevel(srpClient.LogLevel, 2, fmt.Sprintf("无法转发cid：%d的数据到服务：%s", data.CID, err.Error()))
 			}
 			logger.LogWithLevel(srpClient.LogLevel, 2, fmt.Sprintf("转发数据到srp-server，有效载荷大小：%dbyte", data.PayloadLen))
 			logger.LogWithLevel(srpClient.LogLevel, 3, "转发数据到srp-server：")
 			logger.LogWithLevel(srpClient.LogLevel, 3, data.String())
 		case common.TypeDisconnect:
-			if conn, ok := srpClient.UserConnIDMap[data.CID]; ok {
-				srpClient.RemoveUserConn(data.CID)
-				conn.Close()
-				logger.LogWithLevel(srpClient.LogLevel, 2, fmt.Sprintf("关闭cid：%d的连接", data.CID))
-			}
+			srpClient.CloseUserConn(data.CID)
+			logger.LogWithLevel(srpClient.LogLevel, 2, fmt.Sprintf("关闭cid：%d的连接", data.CID))
 		}
 	}
 }

@@ -8,7 +8,6 @@ import (
 	"net"
 	"srp/internal/common"
 	"srp/pkg/logger"
-	"strconv"
 	"sync"
 	"time"
 )
@@ -45,10 +44,13 @@ func (c *Client) AddUserConn(cid uint32, conn net.Conn) {
 	c.UserConnIDMap[cid] = conn
 }
 
-func (c *Client) RemoveUserConn(cid uint32) {
+func (c *Client) CloseUserConn(cid uint32) {
 	c.Mu.Lock()
 	defer c.Mu.Unlock()
-	delete(c.UserConnIDMap, cid)
+	if conn, ok := c.UserConnIDMap[cid]; ok {
+		conn.Close()
+		delete(c.UserConnIDMap, cid)
+	}
 }
 
 func (c *Client) CloseAllServiceConn() {
@@ -89,9 +91,9 @@ func (c *Client) EstablishServerConn() {
 		// 判断是否超时
 		var netErr net.Error
 		if errors.As(err, &netErr) && netErr.Timeout() {
-			log.Fatal("连接超时，请检查必要信息，然后在稍后重试")
+			log.Fatal("连接超时，请检查必要信息，在稍后重试")
 		} else {
-			log.Fatal("与 srp-server 建立连接失败：" + err.Error())
+			log.Fatal("与srp-server建立连接失败：" + err.Error())
 		}
 	}
 
@@ -118,7 +120,7 @@ func (c *Client) HandleServerDataTCP(data common.Proto) {
 	cid := data.CID
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", c.ServiceIP, c.ServicePort))
 	if err != nil {
-		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("拒绝连接(cid：%d)，无法建立和服务(%s)的连接，%s", cid, conn.RemoteAddr(), err.Error()))
+		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf(fmt.Sprintf("拒绝用户连接(cid：%d)，无法和服务建立连接：%s", cid, err.Error())))
 		data = common.NewProto(common.CodeForbidden, common.TypeRejectConn, cid, []byte{})
 		isReject = true
 	} else {
@@ -128,13 +130,13 @@ func (c *Client) HandleServerDataTCP(data common.Proto) {
 
 	dataByte, err := data.EncodeProto()
 	if err != nil {
-		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("建立连接(cid：%d)加入时无法处理数据，%s", cid, err.Error()))
+		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法处理用户连接(cid: %d)，构造数据失败：%s", cid, err.Error()))
 		conn.Close()
 		return
 	}
 
 	if _, err = c.ServerConn.Write(dataByte); err != nil {
-		logger.LogWithLevel(c.LogLevel, 2, "无法向srp-server发送处理连接的数据，"+err.Error())
+		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法处理用户连接(cid：%d)，向srp-server发送数据失败：%s", cid, err.Error()))
 		return
 	}
 
@@ -155,14 +157,11 @@ func (c *Client) HandleServerDataTCP(data common.Proto) {
 		dataByte = make([]byte, common.MaxBufferSize)
 		byteLen, err := conn.Read(dataByte)
 		if err != nil {
-			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("用户连接(cid：%d)的服务连接(%s->%s)断开，%s", cid, conn.LocalAddr(), conn.RemoteAddr(), err.Error()))
+			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("用户连接(cid：%d)的服务连接断开，%s", cid, err.Error()))
 			data = common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte{})
-			if _, ok := c.UserConnIDMap[data.CID]; ok {
-				dataByteEncoded, _ := data.EncodeProto()
-				c.ServerConn.Write(dataByteEncoded)
-				c.RemoveUserConn(cid)
-				conn.Close()
-			}
+			dataByteEncoded, _ := data.EncodeProto()
+			c.ServerConn.Write(dataByteEncoded)
+			c.CloseUserConn(cid)
 			return
 		}
 
@@ -171,16 +170,14 @@ func (c *Client) HandleServerDataTCP(data common.Proto) {
 		data = common.NewProto(common.CodeSuccess, common.TypeForwarding, cid, dataByte)
 		dataByteEncoded, err := data.EncodeProto()
 		if err != nil {
-			logger.LogWithLevel(c.LogLevel, 2, "处理cid："+strconv.Itoa(int(cid))+"的本地连接"+conn.LocalAddr().String()+"的消息失败，"+err.Error())
-			c.RemoveUserConn(cid)
-			conn.Close()
+			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法处理用户连接(cid：%d)的服务响应数据：%s", cid, err.Error()))
+			c.CloseUserConn(cid)
 			return
 		}
 
 		if _, err = c.ServerConn.Write(dataByteEncoded); err != nil {
-			logger.LogWithLevel(c.LogLevel, 2, "发送cid："+strconv.Itoa(int(cid))+"的本地连接"+conn.LocalAddr().String()+"的消息失败，"+err.Error())
-			c.RemoveUserConn(cid)
-			conn.Close()
+			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向srp-server发送用户连接(cid: %d)的服务响应数据：%s", cid, err.Error()))
+			c.CloseUserConn(cid)
 			return
 		}
 	}

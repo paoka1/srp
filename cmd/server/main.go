@@ -19,10 +19,10 @@ func main() {
 
 	clientIP := flag.String("client-ip", "0.0.0.0", "srp-client连接的IP地址")
 	clientPort := flag.Int("client-port", 6352, "srp-client连接的端口")
-	userIP := flag.String("server-ip", "0.0.0.0", "用户访问的IP地址")
-	userPort := flag.Int("user-port", 9352, "用户访问转发服务的端口")
-	serverPassword := flag.String("server-pwd", common.DefaultServerPasswd, "访问转发服务的密码")
-	protocol := flag.String("protocol", "tcp", "srp-client和转发服务间通信的协议，支持："+utils.Protocols2String(common.Protocols))
+	userIP := flag.String("server-ip", "0.0.0.0", "用户访问被转发服务的IP地址")
+	userPort := flag.Int("user-port", 9352, "用户访问被转发服务的端口")
+	serverPassword := flag.String("server-pwd", common.DefaultServerPasswd, "srp-server连接密码")
+	protocol := flag.String("protocol", "tcp", "用户和srp-server间的通信协议，支持："+utils.Protocols2String(common.Protocols))
 	logLevel := flag.Int("log-level", 2, fmt.Sprintf("日志级别（1-%d）", logger.MaxLogLevel))
 	flag.Parse()
 
@@ -52,7 +52,7 @@ func main() {
 		srpServer.HandleNewConn = srpServer.HandleUserConnTCP
 		srpServer.AcceptUserConn = srpServer.AcceptUserConnTCP
 	default:
-		log.Fatal("无效的协议：" + srpServer.ServiceProtocol)
+		log.Fatal("不支持的协议：" + srpServer.ServiceProtocol)
 	}
 
 	logger.LogWithLevel(srpServer.LogLevel, 1, fmt.Sprintf("srp-client连接地址：%s:%d", srpServer.ClientIP, srpServer.ClientPort))
@@ -88,11 +88,8 @@ func main() {
 			logger.LogWithLevel(srpServer.LogLevel, 3, data.String())
 		case data := <-srpServer.DataChan2User:
 			if data.Type == common.TypeDisconnect {
-				if conn, ok := srpServer.UserConnIDMap[data.CID]; ok {
-					srpServer.RemoveUserConn(data.CID)
-					conn.Close()
-					logger.LogWithLevel(srpServer.LogLevel, 2, fmt.Sprintf("关闭user(cid：%d)的连接", data.CID))
-				}
+				srpServer.CloseUserConn(data.CID)
+				logger.LogWithLevel(srpServer.LogLevel, 2, fmt.Sprintf("关闭user(cid：%d)的连接", data.CID))
 				continue
 			}
 			conn := srpServer.UserConnIDMap[data.CID]
