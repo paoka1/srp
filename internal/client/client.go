@@ -36,6 +36,9 @@ type Client struct {
 	// 处理 SRP 客户端与服务之间连接的函数
 	// 在运行时动态根据命令行参数被赋值
 	HandleServerData func(data common.Proto)
+
+	// 转发 UDP 流量时，该字段被赋值
+	UDPConn common.UDPConn
 }
 
 func (c *Client) AddUserConn(cid uint32, conn net.Conn) {
@@ -189,5 +192,60 @@ func (c *Client) HandleServerDataTCP(data common.Proto) {
 
 // HandleServerDataUDP 处理 UDP 数据
 func (c *Client) HandleServerDataUDP(data common.Proto) {
+	// 初始化
+	cid := data.CID
+	clientAddr, _ := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", c.ServiceIP, c.ServicePort))
+	conn := &common.UDPWrapper{
+		ClientAddr: clientAddr,
+		ReadC:      make(chan []byte, 100),
+		Sigc:       make(chan struct{}),
+	}
+	conn.SetDeadline(time.Now().Add(common.UDPTimeOut))
 
+	// 发送连接请求响应
+	data = common.NewProto(common.CodeSuccess, common.TypeAcceptConn, cid, []byte{})
+	dataByte, err := data.EncodeProto()
+	if err != nil {
+		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法处理用户连接(cid: %d)，构造数据失败：%s", cid, err.Error()))
+		conn.Close()
+		return
+	}
+
+	if _, err = c.ServerConn.Write(dataByte); err != nil {
+		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法处理用户连接(cid：%d)，向srp-server发送数据失败：%s", cid, err.Error()))
+		return
+	}
+
+	// 记录映射
+	c.AddUserConn(cid, conn)
+	c.UDPConn.AddConn(conn.ClientAddr, conn)
+	logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("建立连接(cid：%d)：srp-client->%s", cid, conn.RemoteAddr()))
+
+	for {
+		dataByte := make([]byte, common.MaxBufferSize)
+		dataByteLen, err := conn.Read(dataByte)
+		if err != nil {
+			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("用户连接(cid：%d)的服务连接断开，%s", cid, err.Error()))
+			data = common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte{})
+			dataByteEncoded, _ := data.EncodeProto()
+			c.ServerConn.Write(dataByteEncoded)
+			c.CloseUserConn(cid)
+			c.UDPConn.DelConn(conn.ClientAddr)
+			return
+		}
+
+		// 只传输读取的所有数据，而不是原来的 dataByte
+		dataByte = dataByte[:dataByteLen]
+		data = common.NewProto(common.CodeSuccess, common.TypeForwarding, cid, dataByte)
+		dataByteEncoded, err := data.EncodeProto()
+		if err != nil {
+			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法处理用户连接(cid：%d)的服务响应数据：%s", cid, err.Error()))
+			continue
+		}
+
+		if _, err = c.ServerConn.Write(dataByteEncoded); err != nil {
+			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向srp-server发送用户连接(cid: %d)的服务响应数据：%s", cid, err.Error()))
+			continue
+		}
+	}
 }

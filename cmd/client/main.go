@@ -45,6 +45,12 @@ func main() {
 	switch srpClient.ServerProtocol {
 	case "tcp":
 		srpClient.HandleServerData = srpClient.HandleServerDataTCP
+	case "udp":
+		srpClient.HandleServerData = srpClient.HandleServerDataUDP
+		srpClient.UDPConn = common.UDPConn{
+			AddrConnMap: make(map[string]*common.UDPWrapper),
+			Mu:          srpClient.Mu,
+		}
 	default:
 		log.Fatal("不支持的协议：" + srpClient.ServerProtocol)
 	}
@@ -81,7 +87,7 @@ func main() {
 			if _, err := conn.Write(data.Payload); err != nil {
 				logger.LogWithLevel(srpClient.LogLevel, 2, fmt.Sprintf("无法转发cid：%d的数据到服务：%s", data.CID, err.Error()))
 			}
-			logger.LogWithLevel(srpClient.LogLevel, 2, fmt.Sprintf("转发数据到srp-server，有效载荷大小：%dbyte", data.PayloadLen))
+			logger.LogWithLevel(srpClient.LogLevel, 2, fmt.Sprintf("转发数据到服务，有效载荷大小：%dbyte", data.PayloadLen))
 			logger.LogWithLevel(srpClient.LogLevel, 3, "转发数据到srp-server：")
 			logger.LogWithLevel(srpClient.LogLevel, 3, data.String())
 		case common.TypeDisconnect:

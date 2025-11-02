@@ -51,6 +51,9 @@ func main() {
 	case "tcp":
 		srpServer.HandleNewConn = srpServer.HandleUserConnTCP
 		srpServer.AcceptUserConn = srpServer.AcceptUserConnTCP
+	case "udp":
+		srpServer.HandleNewConn = srpServer.HandleUserConnUDP
+		srpServer.AcceptUserConn = srpServer.AcceptUserConnUDP
 	default:
 		log.Fatal("不支持的协议：" + srpServer.ServiceProtocol)
 	}

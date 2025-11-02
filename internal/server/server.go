@@ -211,7 +211,7 @@ func (s *Server) HandleUserConnTCP(values ...interface{}) {
 		conn.Close()
 		return
 	}
-	logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("已向srp-client发送user(%s)的连接申请", conn.RemoteAddr().String()))
+	logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("已向srp-client发送user(%s)的连接申请", conn.RemoteAddr()))
 
 	// 验证 TypeAcceptConn
 	for {
@@ -234,7 +234,7 @@ func (s *Server) HandleUserConnTCP(values ...interface{}) {
 	tcpConn.SetKeepAlive(true)
 
 	s.AddUserConn(cid, conn)
-	logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("建立连接(cid：%d)：%s->%s", cid, conn.LocalAddr().String(), conn.RemoteAddr().String()))
+	logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("建立连接(cid：%d)：%s->%s", cid, conn.LocalAddr(), conn.RemoteAddr()))
 
 	// 读取消息，放到 DataChan2Client
 	for {
@@ -260,15 +260,21 @@ func (s *Server) HandleUserConnTCP(values ...interface{}) {
 func (s *Server) AcceptUserConnUDP() {
 	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", s.UserIP, s.UserPort))
 	if err != nil {
-		log.Fatal("无法解析udp地址：" + addr.String() + err.Error())
+		log.Fatal("无法解析udp地址：" + addr.String() + "，" + err.Error())
 	}
 	conn, err := net.ListenUDP("udp", addr)
 	if err != nil {
-		log.Fatal("无法监听udp地址：" + addr.String() + err.Error())
+		log.Fatal("无法监听udp地址：" + addr.String() + "，" + err.Error())
 	}
 	defer conn.Close()
 
+	// 初始化
 	dataByte := make([]byte, common.MaxBufferSize)
+	udpConn := common.UDPConn{
+		AddrConnMap: make(map[string]*common.UDPWrapper),
+		Mu:          s.Mu,
+	}
+
 	for {
 		n, clientAddr, err := conn.ReadFromUDP(dataByte)
 		if err != nil {
@@ -278,11 +284,81 @@ func (s *Server) AcceptUserConnUDP() {
 		// 拷贝数据，避免被下一次循环覆盖
 		data := make([]byte, n)
 		copy(data, dataByte[:n])
-		go s.HandleUserConnUDP(conn, clientAddr, data)
+		// 查看该远程地址是否已经建立映射
+		if c := udpConn.GetConn(clientAddr); c != nil {
+			c.ReadC <- data
+			continue
+		}
+		go s.HandleUserConnUDP(&udpConn, conn, clientAddr, data)
 	}
 }
 
 // HandleUserConnUDP 完成 UDP 连接创建和接收数据
 func (s *Server) HandleUserConnUDP(values ...interface{}) {
+	udpConn, _ := values[0].(*common.UDPConn)
+	conn, _ := values[1].(*net.UDPConn)
+	clientAddr, _ := values[2].(*net.UDPAddr)
+	data0, _ := values[3].([]byte)
 
+	// 初始化
+	udpWrapper := &common.UDPWrapper{
+		ConnListen: conn,
+		ClientAddr: clientAddr,
+		ReadC:      make(chan []byte, 100),
+		Sigc:       make(chan struct{}),
+	}
+	udpConn.AddConn(clientAddr, udpWrapper)
+
+	// 写入第一次传输的数据
+	udpWrapper.ReadC <- data0
+
+	// 连接申请
+	cid := s.GetNextCID()
+	data := common.NewProto(common.CodeSuccess, common.TypeNewConn, cid, nil)
+	dataByte, err := data.EncodeProto()
+	if err != nil {
+		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝user：%s的连接，无法构造数据，%s", clientAddr, err.Error()))
+		conn.Close()
+		return
+	}
+
+	if _, err = s.ClientConn.Write(dataByte); err != nil {
+		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝user：%s的连接，无法向srp-client发送数据，%s", clientAddr, err.Error()))
+		conn.Close()
+		return
+	}
+
+	// 验证 TypeAcceptConn
+	for {
+		data = <-s.DataChan2Handle
+		if data.CID != cid {
+			// 不是自己的就放进去
+			s.DataChan2Handle <- data
+			continue
+		}
+		break
+	}
+
+	// 添加新的连接
+	s.AddUserConn(cid, udpWrapper)
+	logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("建立连接(cid：%d)：%s->srp-server", cid, clientAddr))
+	// 设置 deadline
+	udpWrapper.SetDeadline(time.Now().Add(common.UDPTimeOut))
+
+	for {
+		dataByte = make([]byte, common.MaxBufferSize)
+		dataByteLen, err := udpWrapper.Read(dataByte)
+		if err != nil {
+			logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("与user：%s的断开连接，%s", clientAddr, err.Error()))
+			data = common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte{})
+			s.DataChan2Client <- data
+			s.CloseUserConn(cid)
+			udpConn.DelConn(clientAddr)
+			return
+		}
+
+		dataByte = dataByte[:dataByteLen]
+		data = common.NewProto(common.CodeSuccess, common.TypeForwarding, cid, dataByte)
+		s.DataChan2Client <- data
+	}
 }
