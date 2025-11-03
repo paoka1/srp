@@ -47,10 +47,6 @@ func main() {
 		srpClient.HandleServerData = srpClient.HandleServerDataTCP
 	case "udp":
 		srpClient.HandleServerData = srpClient.HandleServerDataUDP
-		srpClient.UDPConn = common.UDPConn{
-			AddrConnMap: make(map[string]*common.UDPWrapper),
-			Mu:          srpClient.Mu,
-		}
 	default:
 		log.Fatal("不支持的协议：" + srpClient.ServerProtocol)
 	}

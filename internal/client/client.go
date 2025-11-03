@@ -36,9 +36,6 @@ type Client struct {
 	// 处理 SRP 客户端与服务之间连接的函数
 	// 在运行时动态根据命令行参数被赋值
 	HandleServerData func(data common.Proto)
-
-	// 转发 UDP 流量时，该字段被赋值
-	UDPConn common.UDPConn
 }
 
 func (c *Client) AddUserConn(cid uint32, conn net.Conn) {
@@ -195,11 +192,7 @@ func (c *Client) HandleServerDataUDP(data common.Proto) {
 	// 初始化
 	cid := data.CID
 	clientAddr, _ := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", c.ServiceIP, c.ServicePort))
-	conn := &common.UDPWrapper{
-		ClientAddr: clientAddr,
-		ReadC:      make(chan []byte, 100),
-		Sigc:       make(chan struct{}),
-	}
+	conn, _ := net.DialUDP("udp", nil, clientAddr)
 	conn.SetDeadline(time.Now().Add(common.UDPTimeOut))
 
 	// 发送连接请求响应
@@ -218,7 +211,6 @@ func (c *Client) HandleServerDataUDP(data common.Proto) {
 
 	// 记录映射
 	c.AddUserConn(cid, conn)
-	c.UDPConn.AddConn(conn.ClientAddr, conn)
 	logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("建立连接(cid：%d)：srp-client->%s", cid, conn.RemoteAddr()))
 
 	for {
@@ -230,7 +222,6 @@ func (c *Client) HandleServerDataUDP(data common.Proto) {
 			dataByteEncoded, _ := data.EncodeProto()
 			c.ServerConn.Write(dataByteEncoded)
 			c.CloseUserConn(cid)
-			c.UDPConn.DelConn(conn.ClientAddr)
 			return
 		}
 

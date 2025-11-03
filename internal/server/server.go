@@ -270,8 +270,8 @@ func (s *Server) AcceptUserConnUDP() {
 
 	// 初始化
 	dataByte := make([]byte, common.MaxBufferSize)
-	udpConn := common.UDPConn{
-		AddrConnMap: make(map[string]*common.UDPWrapper),
+	udpConn := &UDPConn{
+		AddrConnMap: make(map[string]*UDPWrapper),
 		Mu:          s.Mu,
 	}
 
@@ -289,20 +289,20 @@ func (s *Server) AcceptUserConnUDP() {
 			c.ReadC <- data
 			continue
 		}
-		go s.HandleUserConnUDP(&udpConn, conn, clientAddr, data)
+		go s.HandleUserConnUDP(udpConn, conn, clientAddr, data)
 	}
 }
 
 // HandleUserConnUDP 完成 UDP 连接创建和接收数据
 func (s *Server) HandleUserConnUDP(values ...interface{}) {
-	udpConn, _ := values[0].(*common.UDPConn)
+	udpConn, _ := values[0].(*UDPConn)
 	conn, _ := values[1].(*net.UDPConn)
 	clientAddr, _ := values[2].(*net.UDPAddr)
 	data0, _ := values[3].([]byte)
 
 	// 初始化
-	udpWrapper := &common.UDPWrapper{
-		ConnListen: conn,
+	udpWrapper := &UDPWrapper{
+		Conn:       conn,
 		ClientAddr: clientAddr,
 		ReadC:      make(chan []byte, 100),
 		Sigc:       make(chan struct{}),

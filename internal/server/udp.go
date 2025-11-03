@@ -1,4 +1,4 @@
-package common
+package server
 
 import (
 	"fmt"
@@ -11,17 +11,15 @@ import (
 // UDPWrapper 包装 UDP 连接以实现 net.Conn。
 // ReadC 模拟 TCP 中的 Read，在超过 UDPTimeOut 的时间未通信后，ReadC 关闭，
 // 阻塞在 Read 的函数会立即返回错误。由 AcceptUserConnUDP 向该 ReadC 写入数据。
-// Write 会向 remoteAddr 写入指定的数据
+// Write 会向 ClientAddr 写入指定的数据
 type UDPWrapper struct {
-	ConnListen *net.UDPConn // 监听
-	ConnSend   *net.UDPConn // 发送
-
+	Conn       *net.UDPConn
 	ClientAddr *net.UDPAddr // 远程地址
 
-	ReadC chan []byte // 从该 UDP 连接中读取数据
+	ReadC chan []byte   // 从该 UDP 连接中读取数据
+	Sigc  chan struct{} // signal cancel: deadline 取消信号
 
 	Deadline time.Time
-	Sigc     chan struct{} // signal cancel: deadline 取消信号
 }
 
 // 实现 net.Conn 的 Read
@@ -39,7 +37,7 @@ func (u *UDPWrapper) Read(b []byte) (int, error) {
 			if !ok {
 				return 0, fmt.Errorf("read chan closed")
 			}
-			copy(data, b)
+			copy(b, data)
 			return len(data), nil
 		case <-u.Sigc:
 			if !timer.Stop() {
@@ -49,7 +47,7 @@ func (u *UDPWrapper) Read(b []byte) (int, error) {
 			timer.Reset(time.Until(u.Deadline))
 			continue
 		case <-time.After(time.Until(u.Deadline)):
-			return 0, fmt.Errorf("read time closed")
+			return 0, fmt.Errorf("read/write timeout")
 		}
 	}
 }
@@ -62,23 +60,10 @@ func (u *UDPWrapper) Write(b []byte) (int, error) {
 	if u.ClientAddr == nil {
 		return 0, fmt.Errorf("remote address not set")
 	}
-	if u.ConnSend == nil {
-		conn, err := net.DialUDP("udp", nil, u.ClientAddr)
-		if err != nil {
-			return 0, err
-		}
-		u.ConnSend = conn
-	}
-	if u.ConnListen != nil {
-		return u.ConnListen.WriteToUDP(b, u.ClientAddr)
-	}
-	return u.ConnSend.Write(b)
+	return u.Conn.WriteToUDP(b, u.ClientAddr)
 }
 
 func (u *UDPWrapper) Close() error {
-	if u.ConnSend != nil {
-		u.ConnSend.Close()
-	}
 	if u.ReadC == nil {
 		return fmt.Errorf("read chan not set")
 	}
@@ -88,7 +73,7 @@ func (u *UDPWrapper) Close() error {
 }
 
 func (u *UDPWrapper) LocalAddr() net.Addr {
-	return u.ConnListen.LocalAddr()
+	return u.Conn.LocalAddr()
 }
 
 func (u *UDPWrapper) RemoteAddr() net.Addr {
