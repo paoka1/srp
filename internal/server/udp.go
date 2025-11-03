@@ -10,7 +10,7 @@ import (
 
 // UDPWrapper 包装 UDP 连接以实现 net.Conn。
 // ReadC 模拟 TCP 中的 Read，在超过 UDPTimeOut 的时间未通信后，ReadC 关闭，
-// 阻塞在 Read 的函数会立即返回错误。由 AcceptUserConnUDP 向该 ReadC 写入数据。
+// 阻塞在 Read 的函数会立即返回错误。由 AcceptUserConnUDP 向该 chan 写入数据。
 // Write 会向 ClientAddr 写入指定的数据
 type UDPWrapper struct {
 	Conn       *net.UDPConn
