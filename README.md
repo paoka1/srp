@@ -12,7 +12,7 @@ Usage of server.exe:
   -log-level int
         日志级别（1-3） (default 2)
   -protocol string
-        用户和srp-server间的通信协议，支持：tcp协议 (default "tcp")
+        用户和srp-server间的通信协议，支持：tcp协议，udp协议 (default "tcp")
   -server-ip string
         用户访问被转发服务的IP地址 (default "0.0.0.0")
   -server-pwd string
@@ -24,7 +24,7 @@ Usage of client.exe:
   -log-level int
         日志级别（1-3） (default 2)
   -protocol string
-        srp-client和被转发服务的通信协议，支持：tcp协议 (default "tcp")
+        srp-client和被转发服务的通信协议，支持：tcp协议，udp协议 (default "tcp")
   -server-ip string
         srp-server的IP地址 (default "127.0.0.1")
   -server-port int
