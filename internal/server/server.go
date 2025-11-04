@@ -75,11 +75,10 @@ func (s *Server) CloseClientConn() {
 
 func (s *Server) GetNextCID() uint32 {
 	s.Mu.Lock()
-	defer func() {
-		s.CIDNext++
-		s.Mu.Unlock()
-	}()
-	return s.CIDNext
+	defer s.Mu.Unlock()
+	cid := s.CIDNext
+	s.CIDNext++
+	return cid
 }
 
 func (s *Server) CloseAllUserConn() {
