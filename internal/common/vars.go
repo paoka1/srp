@@ -4,7 +4,7 @@ import "time"
 
 const (
 	DefaultServerPasswd = "default_password"
-	MaxBufferSize       = 1500 // 大约等于以太网 MTU
+	MaxBufferSize       = 65507
 	UDPTimeOut          = 3 * time.Minute
 )
 
