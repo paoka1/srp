@@ -81,15 +81,13 @@ func (c *Client) EstablishServerConn() {
 		log.Fatal("与srp-server建立连接失败，无法构造数据：" + err.Error())
 	}
 
-	_, err = conn.Write(dataByte)
-	if err != nil {
+	if _, err = conn.Write(dataByte); err != nil {
 		log.Fatal("与srp-server建立连接失败：" + err.Error())
 	}
 	logger.LogWithLevel(c.LogLevel, 2, "已向srp-server发送验证信息，等待响应")
 
 	// 在 srp-server 在处理连接或已存在连接时，主动退出
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-
 	// 接收响应
 	reader := bufio.NewReader(conn)
 	if err = data.DecodeProto(reader); err != nil {
@@ -105,83 +103,72 @@ func (c *Client) EstablishServerConn() {
 
 	// 取消过期时长
 	conn.SetReadDeadline(time.Time{})
-
 	if data.Code != common.CodeSuccess {
 		conn.Close()
 		log.Fatal("与srp-server建立连接失败：连接密码错误")
 	}
 
-	tcpConn := conn.(*net.TCPConn)
-	tcpConn.SetKeepAlive(true)
-
+	// 添加连接
+	(conn.(*net.TCPConn)).SetKeepAlive(true)
 	c.ServerConn = conn
 	logger.LogWithLevel(c.LogLevel, 1, "成功与srp-server建立连接")
 }
 
+// SendDataToServer 向 srp-server 发送数据
+func (c *Client) SendDataToServer(p common.Proto) error {
+	if c.ServerConn == nil {
+		return fmt.Errorf("未建立和srp-server的连接")
+	}
+	dataByte, err := p.EncodeProto()
+	if err != nil {
+		return err
+	}
+	_, err = c.ServerConn.Write(dataByte)
+	return err
+}
+
 // HandleServerDataTCP 处理 TCP 数据
 func (c *Client) HandleServerDataTCP(data common.Proto) {
-	var isReject bool
-
-	// 获得 CID
 	cid := data.CID
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", c.ServiceIP, c.ServicePort))
 	if err != nil {
 		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf(fmt.Sprintf("拒绝用户连接(cid：%d)，无法和服务建立连接：%s", cid, err.Error())))
 		data = common.NewProto(common.CodeForbidden, common.TypeRejectConn, cid, []byte{})
-		isReject = true
 	} else {
 		data = common.NewProto(common.CodeSuccess, common.TypeAcceptConn, cid, []byte{})
-		isReject = false
 	}
 
-	dataByte, err := data.EncodeProto()
-	if err != nil {
-		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法处理用户连接(cid: %d)，构造数据失败：%s", cid, err.Error()))
+	if err := c.SendDataToServer(data); err != nil {
 		conn.Close()
+		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向srp-server发送数据，%s", err.Error()))
 		return
 	}
 
-	if _, err = c.ServerConn.Write(dataByte); err != nil {
-		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法处理用户连接(cid：%d)，向srp-server发送数据失败：%s", cid, err.Error()))
+	if data.Type == common.TypeRejectConn {
 		return
 	}
 
-	if isReject {
-		conn.Close()
-		return
-	}
-
-	tcpConn := conn.(*net.TCPConn)
-	tcpConn.SetKeepAlive(true)
-
+	(conn.(*net.TCPConn)).SetKeepAlive(true)
 	c.AddUserConn(cid, conn)
 	logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("建立连接(cid：%d)：%s->%s", cid, conn.LocalAddr(), conn.RemoteAddr()))
 
 	// 阻塞在获取 service 消息处
 	// 获得消息后立刻包装发送
 	for {
-		dataByte = make([]byte, common.MaxBufferSize)
+		dataByte := make([]byte, common.MaxBufferSize)
 		byteLen, err := conn.Read(dataByte)
 		if err != nil {
 			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("用户连接(cid：%d)的服务连接断开，%s", cid, err.Error()))
-			data = common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte{})
-			dataByteEncoded, _ := data.EncodeProto()
-			c.ServerConn.Write(dataByteEncoded)
+			c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte{}))
 			c.CloseUserConn(cid)
 			return
 		}
 
 		// 只传输读取的所有数据，而不是原来的 dataByte
 		dataByte = dataByte[:byteLen]
-		data = common.NewProto(common.CodeSuccess, common.TypeForwarding, cid, dataByte)
-		dataByteEncoded, err := data.EncodeProto()
+		err = c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeForwarding, cid, dataByte))
 		if err != nil {
-			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法处理用户连接(cid：%d)的服务响应数据：%s", cid, err.Error()))
-			continue
-		}
-
-		if _, err = c.ServerConn.Write(dataByteEncoded); err != nil {
-			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向srp-server发送用户连接(cid: %d)的服务响应数据：%s", cid, err.Error()))
+			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向srp-server发送用户(cid:%d)的数据，%s", cid, err.Error()))
 			continue
 		}
 	}
