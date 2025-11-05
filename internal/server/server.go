@@ -101,9 +101,8 @@ func (s *Server) AcceptClient() {
 		if err != nil {
 			logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝srp-client：%s的连接，%s", conn.RemoteAddr(), err.Error()))
 			continue
-		} else {
-			logger.LogWithLevel(s.LogLevel, 1, fmt.Sprintf("开始处理srp-client：%s的连接", conn.RemoteAddr()))
 		}
+		logger.LogWithLevel(s.LogLevel, 1, fmt.Sprintf("开始处理srp-client：%s的连接", conn.RemoteAddr()))
 		s.HandleClient(conn)
 	}
 }
@@ -112,7 +111,6 @@ func (s *Server) AcceptClient() {
 func (s *Server) HandleClient(conn net.Conn) {
 	// 设置期限
 	conn.SetReadDeadline(time.Now().Add(3 * time.Second))
-
 	// 完成验证
 	data := common.Proto{}
 	reader := bufio.NewReader(conn)
@@ -122,8 +120,7 @@ func (s *Server) HandleClient(conn net.Conn) {
 		return
 	}
 
-	authFailed := data.Type != common.TypePing || string(data.Payload) != s.ServerPassword
-	if authFailed {
+	if data.Type != common.TypePing || string(data.Payload) != s.ServerPassword {
 		data = common.NewProto(common.CodeForbidden, common.TypePong, 0, []byte("reject"))
 	} else {
 		data = common.NewProto(common.CodeSuccess, common.TypePong, 0, []byte("accept"))
@@ -143,7 +140,7 @@ func (s *Server) HandleClient(conn net.Conn) {
 		return
 	}
 
-	if authFailed {
+	if data.Code == common.CodeForbidden {
 		conn.Close()
 		logger.LogWithLevel(s.LogLevel, 1, fmt.Sprintf("拒绝srp-client：%s的连接，密码错误", conn.RemoteAddr()))
 		return
