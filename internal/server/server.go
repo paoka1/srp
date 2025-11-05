@@ -99,7 +99,7 @@ func (s *Server) AcceptClient() {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝srp-client：%s的连接，%s", conn.RemoteAddr(), err.Error()))
+			logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝srp-client：%s的连接，%s", conn.RemoteAddr(), err))
 			continue
 		}
 		logger.LogWithLevel(s.LogLevel, 1, fmt.Sprintf("开始处理srp-client：%s的连接", conn.RemoteAddr()))
@@ -116,7 +116,7 @@ func (s *Server) HandleClient(conn net.Conn) {
 	reader := bufio.NewReader(conn)
 	if err := data.DecodeProto(reader); err != nil {
 		conn.Close()
-		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝srp-client：%s的连接，%s", conn.RemoteAddr(), err.Error()))
+		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝srp-client：%s的连接，%s", conn.RemoteAddr(), err))
 		return
 	}
 
@@ -130,13 +130,13 @@ func (s *Server) HandleClient(conn net.Conn) {
 	dataByte, err := data.EncodeProto()
 	if err != nil {
 		conn.Close()
-		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝srp-client：%s的连接，无法处理数据，%s", conn.RemoteAddr(), err.Error()))
+		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝srp-client：%s的连接，无法处理数据，%s", conn.RemoteAddr(), err))
 		return
 	}
 
 	if _, err = conn.Write(dataByte); err != nil {
 		conn.Close()
-		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝srp-client：%s的连接，无法发送数据，%s", conn.RemoteAddr(), err.Error()))
+		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝srp-client：%s的连接，无法发送数据，%s", conn.RemoteAddr(), err))
 		return
 	}
 
@@ -154,7 +154,7 @@ func (s *Server) HandleClient(conn net.Conn) {
 	// 接收来自 srp-client 的消息，放到 DataChan2User
 	for {
 		if err = data.DecodeProto(reader); err != nil {
-			logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("与srp-client：%s的连接断开，%s", conn.RemoteAddr(), err.Error()))
+			logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("与srp-client：%s的连接断开，%s", conn.RemoteAddr(), err))
 			s.CloseClientConn()
 			s.CloseAllUserConn()
 			return
@@ -189,7 +189,7 @@ func (s *Server) AcceptUserConnTCP() {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝user：%s的连接，%s", conn.RemoteAddr(), err.Error()))
+			logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝user：%s的连接，%s", conn.RemoteAddr(), err))
 			continue
 		}
 		go s.HandleNewConn(conn)
@@ -209,7 +209,7 @@ func (s *Server) HandleUserConnTCP(values ...interface{}) {
 	cid := s.GetNextCID()
 	err := s.SendDataToClient(common.NewProto(common.CodeSuccess, common.TypeNewConn, cid, nil))
 	if err != nil {
-		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝user：%s的连接，向srp-client发送数据，%s", conn.RemoteAddr(), err.Error()))
+		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝user：%s的连接，向srp-client发送数据，%s", conn.RemoteAddr(), err))
 		conn.Close()
 		return
 	}
@@ -241,7 +241,7 @@ func (s *Server) HandleUserConnTCP(values ...interface{}) {
 		dataByte := make([]byte, common.MaxBufferSize)
 		byteLen, err := conn.Read(dataByte)
 		if err != nil {
-			logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("与user：%s的断开连接，%s", conn.RemoteAddr(), err.Error()))
+			logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("与user：%s的断开连接，%s", conn.RemoteAddr(), err))
 			s.DataChan2Client <- common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte{})
 			s.CloseUserConn(cid)
 			return
@@ -313,7 +313,7 @@ func (s *Server) HandleUserConnUDP(values ...interface{}) {
 	cid := s.GetNextCID()
 	err := s.SendDataToClient(common.NewProto(common.CodeSuccess, common.TypeNewConn, cid, nil))
 	if err != nil {
-		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝user：%s的连接，无法向srp-client发送数据，%s", clientAddr, err.Error()))
+		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝user：%s的连接，无法向srp-client发送数据，%s", clientAddr, err))
 		conn.Close()
 		return
 	}
@@ -339,7 +339,7 @@ func (s *Server) HandleUserConnUDP(values ...interface{}) {
 		dataByte := make([]byte, common.MaxBufferSize)
 		dataByteLen, err := udpWrapper.Read(dataByte)
 		if err != nil {
-			logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("与user：%s的断开连接，%s", clientAddr, err.Error()))
+			logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("与user：%s的断开连接，%s", clientAddr, err))
 			s.DataChan2Client <- common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte{})
 			s.CloseUserConn(cid)
 			udpConn.DelConn(clientAddr)

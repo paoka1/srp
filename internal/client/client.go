@@ -132,7 +132,7 @@ func (c *Client) HandleServerDataTCP(data common.Proto) {
 	cid := data.CID
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", c.ServiceIP, c.ServicePort))
 	if err != nil {
-		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf(fmt.Sprintf("拒绝用户连接(cid：%d)，无法和服务建立连接：%s", cid, err.Error())))
+		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf(fmt.Sprintf("拒绝用户连接(cid：%d)，无法和服务建立连接：%s", cid, err)))
 		data = common.NewProto(common.CodeForbidden, common.TypeRejectConn, cid, []byte{})
 	} else {
 		data = common.NewProto(common.CodeSuccess, common.TypeAcceptConn, cid, []byte{})
@@ -140,7 +140,7 @@ func (c *Client) HandleServerDataTCP(data common.Proto) {
 
 	if err := c.SendDataToServer(data); err != nil {
 		conn.Close()
-		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向srp-server发送数据，%s", err.Error()))
+		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向srp-server发送数据，%s", err))
 		return
 	}
 
@@ -158,7 +158,7 @@ func (c *Client) HandleServerDataTCP(data common.Proto) {
 		dataByte := make([]byte, common.MaxBufferSize)
 		byteLen, err := conn.Read(dataByte)
 		if err != nil {
-			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("用户连接(cid：%d)的服务连接断开，%s", cid, err.Error()))
+			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("用户连接(cid：%d)的服务连接断开，%s", cid, err))
 			c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte{}))
 			c.CloseUserConn(cid)
 			return
@@ -167,7 +167,7 @@ func (c *Client) HandleServerDataTCP(data common.Proto) {
 		dataByte = dataByte[:byteLen]
 		err = c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeForwarding, cid, dataByte))
 		if err != nil {
-			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向srp-server发送用户(cid:%d)的数据，%s", cid, err.Error()))
+			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向srp-server发送用户(cid:%d)的数据，%s", cid, err))
 			continue
 		}
 	}
@@ -184,7 +184,7 @@ func (c *Client) HandleServerDataUDP(data common.Proto) {
 	// 发送连接请求响应
 	err := c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeAcceptConn, cid, []byte{}))
 	if err != nil {
-		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法处理用户连接(cid: %d)，构造数据失败：%s", cid, err.Error()))
+		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向srp-server发送数据：%s", err))
 		conn.Close()
 		return
 	}
@@ -196,7 +196,7 @@ func (c *Client) HandleServerDataUDP(data common.Proto) {
 		dataByte := make([]byte, common.MaxBufferSize)
 		dataByteLen, err := conn.Read(dataByte)
 		if err != nil {
-			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("用户连接(cid：%d)的服务连接断开，%s", cid, err.Error()))
+			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("用户连接(cid：%d)的服务连接断开，%s", cid, err))
 			c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte{}))
 			c.CloseUserConn(cid)
 			return
@@ -205,7 +205,7 @@ func (c *Client) HandleServerDataUDP(data common.Proto) {
 		dataByte = dataByte[:dataByteLen]
 		err = c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeForwarding, cid, dataByte))
 		if err != nil {
-			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向srp-server发送用户连接(cid: %d)的服务响应数据：%s", cid, err.Error()))
+			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向srp-server发送数据：%s", err))
 			continue
 		}
 	}

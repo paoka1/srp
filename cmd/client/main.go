@@ -81,7 +81,7 @@ func main() {
 				continue
 			}
 			if _, err := conn.Write(data.Payload); err != nil {
-				logger.LogWithLevel(srpClient.LogLevel, 2, fmt.Sprintf("无法转发cid：%d的数据到服务：%s", data.CID, err.Error()))
+				logger.LogWithLevel(srpClient.LogLevel, 2, fmt.Sprintf("无法转发cid：%d的数据到服务：%s", data.CID, err))
 			}
 			logger.LogWithLevel(srpClient.LogLevel, 2, fmt.Sprintf("转发数据到服务，有效载荷大小：%dbyte", data.PayloadLen))
 			logger.LogWithLevel(srpClient.LogLevel, 3, "转发数据到srp-server：")
