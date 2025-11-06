@@ -42,7 +42,12 @@ func main() {
 		DataChan2User:   make(chan common.Proto, 100),
 		DataChan2Client: make(chan common.Proto, 100),
 		DataChan2Handle: make(chan common.Proto, 100),
-		Mu:              &sync.Mutex{},
+		BufferPool: sync.Pool{
+			New: func() any {
+				return make([]byte, common.MaxBufferSize)
+			},
+		},
+		Mu: &sync.Mutex{},
 	}
 
 	// 根据命令行参数 protocol 选择协议

@@ -37,7 +37,12 @@ func main() {
 		},
 		ServerConn:    nil,
 		UserConnIDMap: make(map[uint32]net.Conn),
-		Mu:            &sync.Mutex{},
+		BufferPool: sync.Pool{
+			New: func() any {
+				return make([]byte, common.MaxBufferSize)
+			},
+		},
+		Mu: &sync.Mutex{},
 	}
 
 	// 根据命令行参数 protocol 选择协议

@@ -35,7 +35,8 @@ type Server struct {
 	DataChan2Client chan common.Proto // data channel to client
 	DataChan2Handle chan common.Proto // data channel to handle
 
-	Mu *sync.Mutex
+	BufferPool sync.Pool // 缓冲区复用
+	Mu         *sync.Mutex
 
 	// 处理 SRP 客户端与服务之间连接的函数
 	// 在运行时动态根据命令行参数被赋值
@@ -237,18 +238,18 @@ func (s *Server) HandleUserConnTCP(values ...interface{}) {
 
 	// 读取消息，放到 DataChan2Client
 	for {
-		dataByte := make([]byte, common.MaxBufferSize)
-		byteLen, err := conn.Read(dataByte)
+		buffer := s.BufferPool.Get().([]byte)
+		n, err := conn.Read(buffer)
 		if err != nil {
 			logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("与user：%s的断开连接，%s", conn.RemoteAddr(), err))
 			s.DataChan2Client <- common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte(err.Error()))
 			s.CloseUserConn(cid)
+			s.BufferPool.Put(buffer)
 			return
 		}
-		// 只传输读取的所有数据，而不是原来的 dataByte
-		dataByte = dataByte[:byteLen]
-		// 打上 CID 标签
-		s.DataChan2Client <- common.NewProto(common.CodeSuccess, common.TypeForwarding, cid, dataByte)
+		// 打上 CID 标签，只传输读取的所有数据，而不是原来的 buffer
+		s.DataChan2Client <- common.NewProto(common.CodeSuccess, common.TypeForwarding, cid, buffer[:n])
+		s.BufferPool.Put(buffer)
 	}
 }
 
@@ -265,21 +266,21 @@ func (s *Server) AcceptUserConnUDP() {
 	defer conn.Close()
 
 	// 初始化
-	dataByte := make([]byte, common.MaxBufferSize)
+	buffer := make([]byte, common.MaxBufferSize)
 	udpConn := &UDPConn{
 		AddrConnMap: make(map[string]*UDPWrapper),
 		Mu:          s.Mu,
 	}
 
 	for {
-		n, clientAddr, err := conn.ReadFromUDP(dataByte)
+		n, clientAddr, err := conn.ReadFromUDP(buffer)
 		if err != nil {
 			logger.LogWithLevel(s.LogLevel, 2, "读取udp数据失败："+err.Error())
 			continue
 		}
 		// 拷贝数据，避免被下一次循环覆盖
 		data := make([]byte, n)
-		copy(data, dataByte[:n])
+		copy(data, buffer[:n])
 		// 查看该远程地址是否已经建立映射
 		if c := udpConn.GetConn(clientAddr); c != nil {
 			c.ReadC <- data
@@ -335,16 +336,17 @@ func (s *Server) HandleUserConnUDP(values ...interface{}) {
 	udpWrapper.SetDeadline(time.Now().Add(common.UDPTimeOut))
 
 	for {
-		dataByte := make([]byte, common.MaxBufferSize)
-		dataByteLen, err := udpWrapper.Read(dataByte)
+		buffer := s.BufferPool.Get().([]byte)
+		n, err := udpWrapper.Read(buffer)
 		if err != nil {
 			logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("与user：%s的断开连接，%s", clientAddr, err))
 			s.DataChan2Client <- common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte(err.Error()))
 			s.CloseUserConn(cid)
 			udpConn.DelConn(clientAddr)
+			s.BufferPool.Put(buffer)
 			return
 		}
-		dataByte = dataByte[:dataByteLen]
-		s.DataChan2Client <- common.NewProto(common.CodeSuccess, common.TypeForwarding, cid, dataByte)
+		s.DataChan2Client <- common.NewProto(common.CodeSuccess, common.TypeForwarding, cid, buffer[:n])
+		s.BufferPool.Put(buffer)
 	}
 }

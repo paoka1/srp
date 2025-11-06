@@ -31,7 +31,8 @@ type Client struct {
 	ServerConn    net.Conn
 	UserConnIDMap map[uint32]net.Conn // map of User Connection ID to Connection
 
-	Mu *sync.Mutex
+	BufferPool sync.Pool // 缓冲区复用
+	Mu         *sync.Mutex
 
 	// 处理 SRP 客户端与服务之间连接的函数
 	// 在运行时动态根据命令行参数被赋值
@@ -155,21 +156,20 @@ func (c *Client) HandleServerDataTCP(data common.Proto) {
 	// 阻塞在获取 service 消息处
 	// 获得消息后立刻包装发送
 	for {
-		dataByte := make([]byte, common.MaxBufferSize)
-		byteLen, err := conn.Read(dataByte)
+		buffer := c.BufferPool.Get().([]byte)
+		n, err := conn.Read(buffer)
 		if err != nil {
 			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("用户连接(cid：%d)的服务连接断开，%s", cid, err))
 			c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte(err.Error())))
 			c.CloseUserConn(cid)
+			c.BufferPool.Put(buffer)
 			return
 		}
-		// 只传输读取的所有数据，而不是原来的 dataByte
-		dataByte = dataByte[:byteLen]
-		err = c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeForwarding, cid, dataByte))
-		if err != nil {
+		// 只传输读取的所有数据，而不是原来的 buffer
+		if err = c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeForwarding, cid, buffer[:n])); err != nil {
 			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向srp-server发送用户(cid:%d)的数据，%s", cid, err))
-			continue
 		}
+		c.BufferPool.Put(buffer)
 	}
 }
 
@@ -193,7 +193,6 @@ func (c *Client) HandleServerDataUDP(data common.Proto) {
 
 	// 设置映射存活时限
 	conn.SetDeadline(time.Now().Add(common.UDPTimeOut))
-
 	// 发送连接请求响应
 	err = c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeAcceptConn, cid, []byte{}))
 	if err != nil {
@@ -206,20 +205,20 @@ func (c *Client) HandleServerDataUDP(data common.Proto) {
 	c.AddUserConn(cid, conn)
 	logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("建立连接(cid：%d)：srp-client->%s", cid, conn.RemoteAddr()))
 	for {
-		dataByte := make([]byte, common.MaxBufferSize)
-		dataByteLen, err := conn.Read(dataByte)
+		buffer := c.BufferPool.Get().([]byte)
+		n, err := conn.Read(buffer)
 		if err != nil {
 			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("用户连接(cid：%d)的服务连接断开，%s", cid, err))
 			c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte(err.Error())))
 			c.CloseUserConn(cid)
+			c.BufferPool.Put(buffer)
 			return
 		}
-		// 只传输读取的所有数据，而不是原来的 dataByte
-		dataByte = dataByte[:dataByteLen]
-		err = c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeForwarding, cid, dataByte))
-		if err != nil {
+		// 只传输读取的所有数据，而不是原来的 buffer
+		if err = c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeForwarding, cid, buffer[:n])); err != nil {
 			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向srp-server发送数据：%s", err))
 			continue
 		}
+		c.BufferPool.Put(buffer)
 	}
 }
