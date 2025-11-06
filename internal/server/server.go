@@ -248,7 +248,11 @@ func (s *Server) HandleUserConnTCP(values ...interface{}) {
 			return
 		}
 		// 打上 CID 标签，只传输读取的所有数据，而不是原来的 buffer
-		s.DataChan2Client <- common.NewProto(common.CodeSuccess, common.TypeForwarding, cid, buffer[:n])
+		// 重新申请内存来拷贝 buffer 也许在某些情况下会造成 GC 性能问题
+		// 但其可以保留现有的代码结构，同时发挥缓冲区复用的优势
+		data := make([]byte, n)
+		copy(data, buffer[:n])
+		s.DataChan2Client <- common.NewProto(common.CodeSuccess, common.TypeForwarding, cid, data)
 		s.BufferPool.Put(buffer)
 	}
 }
@@ -346,7 +350,9 @@ func (s *Server) HandleUserConnUDP(values ...interface{}) {
 			s.BufferPool.Put(buffer)
 			return
 		}
-		s.DataChan2Client <- common.NewProto(common.CodeSuccess, common.TypeForwarding, cid, buffer[:n])
+		data := make([]byte, n)
+		copy(data, buffer[:n])
+		s.DataChan2Client <- common.NewProto(common.CodeSuccess, common.TypeForwarding, cid, data)
 		s.BufferPool.Put(buffer)
 	}
 }
