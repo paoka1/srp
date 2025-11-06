@@ -92,7 +92,7 @@ func main() {
 		case data := <-srpServer.DataChan2User:
 			if data.Type == common.TypeDisconnect {
 				srpServer.CloseUserConn(data.CID)
-				logger.LogWithLevel(srpServer.LogLevel, 2, fmt.Sprintf("关闭user(cid：%d)的连接", data.CID))
+				logger.LogWithLevel(srpServer.LogLevel, 2, fmt.Sprintf("关闭user(cid：%d)的连接，srp-client：%s", data.CID, data.Payload))
 				continue
 			}
 			conn := srpServer.GetUserConn(data.CID)

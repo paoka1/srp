@@ -105,7 +105,7 @@ func (c *Client) EstablishServerConn() {
 	conn.SetReadDeadline(time.Time{})
 	if data.Code != common.CodeSuccess {
 		conn.Close()
-		log.Fatal("与srp-server建立连接失败：连接密码错误")
+		log.Fatal("与srp-server建立连接失败，%s" + string(data.Payload))
 	}
 
 	// 添加连接
@@ -133,7 +133,7 @@ func (c *Client) HandleServerDataTCP(data common.Proto) {
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", c.ServiceIP, c.ServicePort))
 	if err != nil {
 		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf(fmt.Sprintf("拒绝用户连接(cid：%d)，无法和服务建立连接：%s", cid, err)))
-		data = common.NewProto(common.CodeForbidden, common.TypeRejectConn, cid, []byte{})
+		data = common.NewProto(common.CodeForbidden, common.TypeRejectConn, cid, []byte(err.Error()))
 	} else {
 		data = common.NewProto(common.CodeSuccess, common.TypeAcceptConn, cid, []byte{})
 	}
@@ -159,7 +159,7 @@ func (c *Client) HandleServerDataTCP(data common.Proto) {
 		byteLen, err := conn.Read(dataByte)
 		if err != nil {
 			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("用户连接(cid：%d)的服务连接断开，%s", cid, err))
-			c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte{}))
+			c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte(err.Error())))
 			c.CloseUserConn(cid)
 			return
 		}
@@ -177,12 +177,25 @@ func (c *Client) HandleServerDataTCP(data common.Proto) {
 func (c *Client) HandleServerDataUDP(data common.Proto) {
 	// 初始化
 	cid := data.CID
-	clientAddr, _ := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", c.ServiceIP, c.ServicePort))
-	conn, _ := net.DialUDP("udp", nil, clientAddr)
+	clientAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", c.ServiceIP, c.ServicePort))
+	if err != nil {
+		c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte(err.Error())))
+		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向服务发起UDP连接，%s", err))
+		return
+	}
+
+	conn, err := net.DialUDP("udp", nil, clientAddr)
+	if err != nil {
+		c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte(err.Error())))
+		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向服务发起UDP连接，%s", err))
+		return
+	}
+
+	// 设置映射存活时限
 	conn.SetDeadline(time.Now().Add(common.UDPTimeOut))
 
 	// 发送连接请求响应
-	err := c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeAcceptConn, cid, []byte{}))
+	err = c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeAcceptConn, cid, []byte{}))
 	if err != nil {
 		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向srp-server发送数据：%s", err))
 		conn.Close()
@@ -197,7 +210,7 @@ func (c *Client) HandleServerDataUDP(data common.Proto) {
 		dataByteLen, err := conn.Read(dataByte)
 		if err != nil {
 			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("用户连接(cid：%d)的服务连接断开，%s", cid, err))
-			c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte{}))
+			c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte(err.Error())))
 			c.CloseUserConn(cid)
 			return
 		}

@@ -88,7 +88,7 @@ func main() {
 			logger.LogWithLevel(srpClient.LogLevel, 3, data.String())
 		case common.TypeDisconnect:
 			srpClient.CloseUserConn(data.CID)
-			logger.LogWithLevel(srpClient.LogLevel, 2, fmt.Sprintf("关闭cid：%d的连接", data.CID))
+			logger.LogWithLevel(srpClient.LogLevel, 2, fmt.Sprintf("关闭cid：%d的连接，srp-server：%s", data.CID, data.Payload))
 		}
 	}
 }
