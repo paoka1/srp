@@ -330,6 +330,12 @@ func (s *Server) HandleUserConnUDP(values ...interface{}) {
 			s.DataChan2Handle <- data
 			continue
 		}
+		if data.Type == common.TypeDisconnect {
+			logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("无法建立UDP连接，srp-server：%s", data.Payload))
+			udpConn.DelConn(clientAddr)
+			udpWrapper.Close()
+			return
+		}
 		break
 	}
 
