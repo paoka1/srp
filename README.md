@@ -1,7 +1,7 @@
 ### SRP（Simple Reverse Proxy 简易反向代理）
 
-#### 1.功能
-TCP反向代理
+#### 1.简介
+TCP、UDP反向代理（内网穿透）和协议转换
 #### 2.用法
 ```
 Usage of server.exe:
@@ -42,9 +42,14 @@ Usage of client.exe:
 
 #### 4.构建
 
-切换目录至`build`运行对应的构建脚本（仅构建linux amd64、windows amd64），构建完成后，二进制文件会被输出到`bin`目录
+切换目录至`build`运行对应的构建脚本，构建的二进制文件会被输出到`bin`目录，或者在项目根目录运行：
 
-#### 5.例子
+```shell
+go build -o client cmd/client/main.go
+go build -o server cmd/server/main.go
+```
+
+#### 5.TCP实例
 
 转发192.168.12.172的ssh服务到192.168.12.1的22端口：
 
@@ -60,7 +65,7 @@ server.exe -user-port 22
 ./client -server-ip 192.168.12.1 -service-port 22
 ```
 
-3.连接192.168.12.172的ssh服务：
+3.在192.168.12.1连接192.168.12.172的ssh服务：
 
 ```shell
 ssh ubuntu@192.168.12.1
