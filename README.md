@@ -1,7 +1,7 @@
 ### SRP（Simple Reverse Proxy 简易反向代理）
 
 #### 1.简介
-TCP、UDP反向代理（内网穿透）和协议转换
+TCP、UDP反向代理（内网穿透）和协议转换工具
 #### 2.用法
 ```
 Usage of server.exe:
