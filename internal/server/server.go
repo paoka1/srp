@@ -236,9 +236,9 @@ func (s *Server) HandleUserConnTCP(values ...interface{}) {
 	s.AddUserConn(cid, conn)
 	logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("建立连接(cid：%d)：%s->%s", cid, conn.LocalAddr(), conn.RemoteAddr()))
 
+	buffer := s.BufferPool.Get().([]byte)
 	// 读取消息，放到 DataChan2Client
 	for {
-		buffer := s.BufferPool.Get().([]byte)
 		n, err := conn.Read(buffer)
 		if err != nil {
 			logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("与user：%s的断开连接，%s", conn.RemoteAddr(), err))
@@ -253,7 +253,6 @@ func (s *Server) HandleUserConnTCP(values ...interface{}) {
 		data := make([]byte, n)
 		copy(data, buffer[:n])
 		s.DataChan2Client <- common.NewProto(common.CodeSuccess, common.TypeForwarding, cid, data)
-		s.BufferPool.Put(buffer)
 	}
 }
 
@@ -345,8 +344,8 @@ func (s *Server) HandleUserConnUDP(values ...interface{}) {
 	// 设置 deadline
 	udpWrapper.SetDeadline(time.Now().Add(common.UDPTimeOut))
 
+	buffer := s.BufferPool.Get().([]byte)
 	for {
-		buffer := s.BufferPool.Get().([]byte)
 		n, err := udpWrapper.Read(buffer)
 		if err != nil {
 			logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("与user：%s的断开连接，%s", clientAddr, err))
@@ -359,6 +358,5 @@ func (s *Server) HandleUserConnUDP(values ...interface{}) {
 		data := make([]byte, n)
 		copy(data, buffer[:n])
 		s.DataChan2Client <- common.NewProto(common.CodeSuccess, common.TypeForwarding, cid, data)
-		s.BufferPool.Put(buffer)
 	}
 }

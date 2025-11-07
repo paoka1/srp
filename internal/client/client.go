@@ -153,10 +153,9 @@ func (c *Client) HandleServerDataTCP(data common.Proto) {
 	c.AddUserConn(cid, conn)
 	logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("建立连接(cid：%d)：%s->%s", cid, conn.LocalAddr(), conn.RemoteAddr()))
 
-	// 阻塞在获取 service 消息处
-	// 获得消息后立刻包装发送
+	buffer := c.BufferPool.Get().([]byte)
+	// 阻塞在获取 service 消息处，获得消息后立刻包装发送
 	for {
-		buffer := c.BufferPool.Get().([]byte)
 		n, err := conn.Read(buffer)
 		if err != nil {
 			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("用户连接(cid：%d)的服务连接断开，%s", cid, err))
@@ -169,7 +168,6 @@ func (c *Client) HandleServerDataTCP(data common.Proto) {
 		if err = c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeForwarding, cid, buffer[:n])); err != nil {
 			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向srp-server发送用户(cid:%d)的数据，%s", cid, err))
 		}
-		c.BufferPool.Put(buffer)
 	}
 }
 
@@ -204,8 +202,8 @@ func (c *Client) HandleServerDataUDP(data common.Proto) {
 	// 记录映射
 	c.AddUserConn(cid, conn)
 	logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("建立连接(cid：%d)：srp-client->%s", cid, conn.RemoteAddr()))
+	buffer := c.BufferPool.Get().([]byte)
 	for {
-		buffer := c.BufferPool.Get().([]byte)
 		n, err := conn.Read(buffer)
 		if err != nil {
 			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("用户连接(cid：%d)的服务连接断开，%s", cid, err))
@@ -219,6 +217,5 @@ func (c *Client) HandleServerDataUDP(data common.Proto) {
 			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向srp-server发送数据：%s", err))
 			continue
 		}
-		c.BufferPool.Put(buffer)
 	}
 }
