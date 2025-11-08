@@ -32,7 +32,7 @@ type Client struct {
 	UserConnIDMap map[uint32]net.Conn // map of User Connection ID to Connection
 
 	BufferPool sync.Pool // 缓冲区复用
-	Mu         *sync.Mutex
+	RWMu       *sync.RWMutex
 
 	// 处理 SRP 客户端与服务之间连接的函数
 	// 在运行时动态根据命令行参数被赋值
@@ -40,20 +40,20 @@ type Client struct {
 }
 
 func (c *Client) AddUserConn(cid uint32, conn net.Conn) {
-	c.Mu.Lock()
-	defer c.Mu.Unlock()
+	c.RWMu.Lock()
+	defer c.RWMu.Unlock()
 	c.UserConnIDMap[cid] = conn
 }
 
 func (c *Client) GetUserConn(cid uint32) net.Conn {
-	c.Mu.Lock()
-	defer c.Mu.Unlock()
+	c.RWMu.RLock()
+	defer c.RWMu.RUnlock()
 	return c.UserConnIDMap[cid]
 }
 
 func (c *Client) CloseUserConn(cid uint32) {
-	c.Mu.Lock()
-	defer c.Mu.Unlock()
+	c.RWMu.Lock()
+	defer c.RWMu.Unlock()
 	if conn, ok := c.UserConnIDMap[cid]; ok {
 		conn.Close()
 		delete(c.UserConnIDMap, cid)
@@ -61,8 +61,8 @@ func (c *Client) CloseUserConn(cid uint32) {
 }
 
 func (c *Client) CloseAllServiceConn() {
-	c.Mu.Lock()
-	defer c.Mu.Unlock()
+	c.RWMu.Lock()
+	defer c.RWMu.Unlock()
 	for _, m := range c.UserConnIDMap {
 		m.Close()
 	}

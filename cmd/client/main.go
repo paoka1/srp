@@ -42,7 +42,7 @@ func main() {
 				return make([]byte, common.MaxBufferSize)
 			},
 		},
-		Mu: &sync.Mutex{},
+		RWMu: &sync.RWMutex{},
 	}
 
 	// 根据命令行参数 protocol 选择协议

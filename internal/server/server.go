@@ -36,7 +36,7 @@ type Server struct {
 	DataChan2Handle chan common.Proto // data channel to handle
 
 	BufferPool sync.Pool // 缓冲区复用
-	Mu         *sync.Mutex
+	RWMu       *sync.RWMutex
 
 	// 处理 SRP 客户端与服务之间连接的函数
 	// 在运行时动态根据命令行参数被赋值
@@ -45,20 +45,20 @@ type Server struct {
 }
 
 func (s *Server) AddUserConn(cid uint32, conn net.Conn) {
-	s.Mu.Lock()
-	defer s.Mu.Unlock()
+	s.RWMu.Lock()
+	defer s.RWMu.Unlock()
 	s.UserConnIDMap[cid] = conn
 }
 
 func (s *Server) GetUserConn(cid uint32) net.Conn {
-	s.Mu.Lock()
-	defer s.Mu.Unlock()
+	s.RWMu.RLock()
+	defer s.RWMu.RUnlock()
 	return s.UserConnIDMap[cid]
 }
 
 func (s *Server) CloseUserConn(cid uint32) {
-	s.Mu.Lock()
-	defer s.Mu.Unlock()
+	s.RWMu.Lock()
+	defer s.RWMu.Unlock()
 	if conn, ok := s.UserConnIDMap[cid]; ok {
 		conn.Close()
 		delete(s.UserConnIDMap, cid)
@@ -66,8 +66,8 @@ func (s *Server) CloseUserConn(cid uint32) {
 }
 
 func (s *Server) CloseClientConn() {
-	s.Mu.Lock()
-	defer s.Mu.Unlock()
+	s.RWMu.Lock()
+	defer s.RWMu.Unlock()
 	if s.ClientConn != nil {
 		s.ClientConn.Close()
 		s.ClientConn = nil
@@ -75,16 +75,16 @@ func (s *Server) CloseClientConn() {
 }
 
 func (s *Server) GetNextCID() uint32 {
-	s.Mu.Lock()
-	defer s.Mu.Unlock()
+	s.RWMu.Lock()
+	defer s.RWMu.Unlock()
 	cid := s.CIDNext
 	s.CIDNext++
 	return cid
 }
 
 func (s *Server) CloseAllUserConn() {
-	s.Mu.Lock()
-	defer s.Mu.Unlock()
+	s.RWMu.Lock()
+	defer s.RWMu.Unlock()
 	for _, c := range s.UserConnIDMap {
 		c.Close()
 	}
@@ -272,7 +272,7 @@ func (s *Server) AcceptUserConnUDP() {
 	buffer := make([]byte, common.MaxBufferSize)
 	udpConn := &UDPConn{
 		AddrConnMap: make(map[string]*UDPWrapper),
-		Mu:          s.Mu,
+		RWMu:        s.RWMu,
 	}
 
 	for {

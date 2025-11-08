@@ -100,23 +100,23 @@ func (u *UDPWrapper) SetWriteDeadline(t time.Time) error {
 type UDPConn struct {
 	AddrConnMap map[string]*UDPWrapper // 远程地址到 UDP 连接的映射
 
-	Mu *sync.Mutex // 该锁应为对 Server 或 Client 中锁的引用
+	RWMu *sync.RWMutex // 该锁应为对 Server 或 Client 中锁的引用
 }
 
 func (u *UDPConn) AddConn(remoteAddr *net.UDPAddr, conn *UDPWrapper) {
-	u.Mu.Lock()
-	defer u.Mu.Unlock()
+	u.RWMu.Lock()
+	defer u.RWMu.Unlock()
 	u.AddrConnMap[remoteAddr.String()] = conn
 }
 
 func (u *UDPConn) DelConn(remoteAddr *net.UDPAddr) {
-	u.Mu.Lock()
-	defer u.Mu.Unlock()
+	u.RWMu.Lock()
+	defer u.RWMu.Unlock()
 	delete(u.AddrConnMap, remoteAddr.String())
 }
 
 func (u *UDPConn) GetConn(remoteAddr *net.UDPAddr) *UDPWrapper {
-	u.Mu.Lock()
-	defer u.Mu.Unlock()
+	u.RWMu.RLock()
+	defer u.RWMu.RUnlock()
 	return u.AddrConnMap[remoteAddr.String()]
 }
