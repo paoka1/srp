@@ -312,7 +312,7 @@ func (s *Server) HandleUserConnUDP(values ...interface{}) {
 		return
 	}
 
-	// 初始化 UDPWrapper
+	// 初始化 UDPWrapper，获取 connection id
 	udpWrapper := &wrappers.UDPWrapper{
 		Conn:           conn,
 		ClientAddr:     clientAddr,
@@ -320,13 +320,6 @@ func (s *Server) HandleUserConnUDP(values ...interface{}) {
 		Sigc:           make(chan struct{}),
 		HandshakeRespC: make(chan common.Proto),
 	}
-
-	// 记录映射
-	udpConn.AddConn(clientAddr, udpWrapper)
-	defer udpConn.DelConn(clientAddr)
-
-	// 写入第一次传输的数据，获取 connection id
-	udpWrapper.ReadC <- data0
 	cid := s.GetNextCID()
 	err := s.SendDataToClient(common.NewProto(common.CodeSuccess, common.TypeNewConn, cid, nil))
 	if err != nil {
@@ -334,15 +327,21 @@ func (s *Server) HandleUserConnUDP(values ...interface{}) {
 		return
 	}
 
-	// 验证 TypeAcceptConn
+	// 记录映射
+	udpConn.AddConn(clientAddr, udpWrapper)
+	defer udpConn.DelConn(clientAddr)
+	s.AddUserConn(cid, udpWrapper)
+	defer s.CloseUserConn(cid)
+
+	// 写入第一次传输的数据，验证 TypeAcceptConn
+	udpWrapper.ReadC <- data0
 	data := <-udpWrapper.HandshakeRespC
 	if data.Type == common.TypeDisconnect {
 		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("无法建立UDP连接，srp-server：%s", data.Payload))
 		return
 	}
 
-	// 添加新的连接，设置 deadline
-	s.AddUserConn(cid, udpWrapper)
+	// 设置 deadline
 	udpWrapper.SetDeadline(time.Now().Add(common.UDPTimeOut))
 	logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("建立连接(cid：%d)：%s->srp-server", cid, clientAddr))
 
