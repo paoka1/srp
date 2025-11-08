@@ -41,7 +41,6 @@ func main() {
 		UserConnIDMap:   make(map[uint32]net.Conn),
 		DataChan2User:   make(chan common.Proto, 100),
 		DataChan2Client: make(chan common.Proto, 100),
-		DataChan2Handle: make(chan common.Proto, 100),
 		BufferPool: sync.Pool{
 			New: func() any {
 				return make([]byte, common.MaxBufferSize)

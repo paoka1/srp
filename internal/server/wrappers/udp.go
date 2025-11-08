@@ -1,9 +1,10 @@
-package server
+package wrappers
 
 import (
 	"fmt"
 	"net"
 	"os"
+	"srp/internal/common"
 	"sync"
 	"time"
 )
@@ -16,8 +17,9 @@ type UDPWrapper struct {
 	Conn       *net.UDPConn
 	ClientAddr *net.UDPAddr // 远程地址
 
-	ReadC chan []byte   // 从该 UDP 连接中读取数据
-	Sigc  chan struct{} // signal cancel: deadline 取消信号
+	ReadC          chan []byte       // 从该 UDP 连接中读取数据
+	Sigc           chan struct{}     // signal cancel: deadline 取消信号
+	HandshakeRespC chan common.Proto // handshake response chan：srp-client 响应的握手信息
 
 	Deadline time.Time
 }

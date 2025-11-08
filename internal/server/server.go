@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"srp/internal/common"
+	"srp/internal/server/wrappers"
 	"srp/pkg/logger"
 	"sync"
 	"time"
@@ -33,15 +34,14 @@ type Server struct {
 
 	DataChan2User   chan common.Proto // data channel to user
 	DataChan2Client chan common.Proto // data channel to client
-	DataChan2Handle chan common.Proto // data channel to handle
 
 	BufferPool sync.Pool // 缓冲区复用
 	RWMu       *sync.RWMutex
 
 	// 处理 SRP 客户端与服务之间连接的函数
 	// 在运行时动态根据命令行参数被赋值
-	HandleNewConn  func(values ...interface{})
 	AcceptUserConn func()
+	HandleNewConn  func(values ...interface{})
 }
 
 func (s *Server) AddUserConn(cid uint32, conn net.Conn) {
@@ -160,7 +160,20 @@ func (s *Server) HandleClient(conn net.Conn) {
 			return
 		}
 		if data.Type == common.TypeAcceptConn || data.Type == common.TypeRejectConn {
-			s.DataChan2Handle <- data
+			conn := s.GetUserConn(data.CID)
+			if conn == nil {
+				logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("无效的cid：%d", data.CID))
+				continue
+			}
+			// 根据不同的连接类型，向该连接的握手 chan 发送数据
+			switch c := conn.(type) {
+			case *wrappers.TCPWrapper:
+				c.HandshakeRespC <- data
+			case *wrappers.UDPWrapper:
+				c.HandshakeRespC <- data
+			default:
+				logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("未知的数据格式（cid：%d）：%T", data.CID, c))
+			}
 		} else {
 			s.DataChan2User <- data
 		}
@@ -196,66 +209,6 @@ func (s *Server) AcceptUserConnTCP() {
 	}
 }
 
-// HandleUserConnTCP 完成 TCP 连接创建和接收数据
-func (s *Server) HandleUserConnTCP(values ...interface{}) {
-	conn, _ := values[0].(net.Conn)
-	if s.ClientConn == nil {
-		conn.Close()
-		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝user：%s的连接，serp-client未连接", conn.RemoteAddr()))
-		return
-	}
-
-	// 完成注册
-	cid := s.GetNextCID()
-	err := s.SendDataToClient(common.NewProto(common.CodeSuccess, common.TypeNewConn, cid, nil))
-	if err != nil {
-		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝user：%s的连接，无法向srp-client发送数据，%s", conn.RemoteAddr(), err))
-		conn.Close()
-		return
-	}
-	logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("已向srp-client发送user(%s)的连接申请", conn.RemoteAddr()))
-
-	// 验证 TypeAcceptConn
-	for {
-		data := <-s.DataChan2Handle
-		if data.CID != cid {
-			// 不是自己的就放进去
-			s.DataChan2Handle <- data
-			continue
-		}
-		if data.Code != common.CodeSuccess || data.Type != common.TypeAcceptConn {
-			logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝user：%s的连接，srp-client拒绝连接：%s", conn.RemoteAddr(), data.Payload))
-			conn.Close()
-			return
-		}
-		break
-	}
-
-	// 添加连接
-	(conn.(*net.TCPConn)).SetKeepAlive(true)
-	s.AddUserConn(cid, conn)
-	logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("建立连接(cid：%d)：%s->%s", cid, conn.LocalAddr(), conn.RemoteAddr()))
-
-	buffer := s.BufferPool.Get().([]byte)
-	// 读取消息，放到 DataChan2Client
-	for {
-		n, err := conn.Read(buffer)
-		if err != nil {
-			logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("与user：%s的断开连接，%s", conn.RemoteAddr(), err))
-			s.DataChan2Client <- common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte(err.Error()))
-			s.CloseUserConn(cid)
-			s.BufferPool.Put(buffer)
-			return
-		}
-		// 打上 CID 标签，只传输读取的所有数据，而不是原来的 buffer
-		// 重新申请内存来拷贝 buffer 也许在某些情况下会造成 GC 性能问题
-		// 但其可以保留现有的代码结构，同时发挥缓冲区复用的优势
-		data := make([]byte, n)
-		copy(data, buffer[:n])
-		s.DataChan2Client <- common.NewProto(common.CodeSuccess, common.TypeForwarding, cid, data)
-	}
-}
-
 // AcceptUserConnUDP 监听和接受 UDP 连接
 func (s *Server) AcceptUserConnUDP() {
 	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", s.UserIP, s.UserPort))
@@ -270,8 +223,8 @@ func (s *Server) AcceptUserConnUDP() {
 
 	// 初始化
 	buffer := make([]byte, common.MaxBufferSize)
-	udpConn := &UDPConn{
-		AddrConnMap: make(map[string]*UDPWrapper),
+	udpConn := &wrappers.UDPConn{
+		AddrConnMap: make(map[string]*wrappers.UDPWrapper),
 		RWMu:        s.RWMu,
 	}
 
@@ -293,66 +246,113 @@ func (s *Server) AcceptUserConnUDP() {
 	}
 }
 
-// HandleUserConnUDP 完成 UDP 连接创建和接收数据
-func (s *Server) HandleUserConnUDP(values ...interface{}) {
-	udpConn, _ := values[0].(*UDPConn)
-	conn, _ := values[1].(*net.UDPConn)
-	clientAddr, _ := values[2].(*net.UDPAddr)
-	data0, _ := values[3].([]byte)
-
-	// 初始化
-	udpWrapper := &UDPWrapper{
-		Conn:       conn,
-		ClientAddr: clientAddr,
-		ReadC:      make(chan []byte, 100),
-		Sigc:       make(chan struct{}),
-	}
-	udpConn.AddConn(clientAddr, udpWrapper)
-
-	// 写入第一次传输的数据
-	udpWrapper.ReadC <- data0
-
-	// 连接申请
-	cid := s.GetNextCID()
-	err := s.SendDataToClient(common.NewProto(common.CodeSuccess, common.TypeNewConn, cid, nil))
-	if err != nil {
-		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝user：%s的连接，无法向srp-client发送数据，%s", clientAddr, err))
+// HandleUserConnTCP 完成 TCP 连接创建和接收数据
+func (s *Server) HandleUserConnTCP(values ...interface{}) {
+	conn, _ := values[0].(net.Conn)
+	if s.ClientConn == nil {
+		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝user：%s的连接，serp-client未连接", conn.RemoteAddr()))
 		conn.Close()
 		return
 	}
 
+	// 获取该连接的 connection id，并初始化
+	cid := s.GetNextCID()
+	tcpWrapper := &wrappers.TCPWrapper{
+		Conn:           conn,
+		HandshakeRespC: make(chan common.Proto),
+	}
+	s.AddUserConn(cid, tcpWrapper)
+	defer s.CloseUserConn(cid)
+
+	err := s.SendDataToClient(common.NewProto(common.CodeSuccess, common.TypeNewConn, cid, nil))
+	if err != nil {
+		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝user：%s的连接，无法向srp-client发送数据，%s", conn.RemoteAddr(), err))
+		return
+	}
+	logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("已向srp-client发送user(%s)的连接申请", conn.RemoteAddr()))
+
 	// 验证 TypeAcceptConn
-	for {
-		data := <-s.DataChan2Handle
-		if data.CID != cid {
-			// 不是自己的就放进去
-			s.DataChan2Handle <- data
-			continue
-		}
-		if data.Type == common.TypeDisconnect {
-			logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("无法建立UDP连接，srp-server：%s", data.Payload))
-			udpConn.DelConn(clientAddr)
-			udpWrapper.Close()
-			return
-		}
-		break
+	data := <-tcpWrapper.HandshakeRespC
+	if data.Code != common.CodeSuccess || data.Type != common.TypeAcceptConn {
+		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝user：%s的连接，srp-client拒绝连接：%s", conn.RemoteAddr(), data.Payload))
+		return
 	}
 
-	// 添加新的连接
-	s.AddUserConn(cid, udpWrapper)
-	logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("建立连接(cid：%d)：%s->srp-server", cid, clientAddr))
-	// 设置 deadline
-	udpWrapper.SetDeadline(time.Now().Add(common.UDPTimeOut))
+	(conn.(*net.TCPConn)).SetKeepAlive(true)
+	logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("建立连接(cid：%d)：%s->%s", cid, conn.LocalAddr(), conn.RemoteAddr()))
 
 	buffer := s.BufferPool.Get().([]byte)
+	defer s.BufferPool.Put(buffer)
+	// 读取消息，放到 DataChan2Client
+	for {
+		n, err := conn.Read(buffer)
+		if err != nil {
+			logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("与user：%s的断开连接，%s", conn.RemoteAddr(), err))
+			s.DataChan2Client <- common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte(err.Error()))
+			return
+		}
+		// 打上 CID 标签，只传输读取的所有数据，而不是原来的 buffer
+		// 重新申请内存来拷贝 buffer 也许在某些情况下会造成 GC 性能问题
+		// 但其可以保留现有的代码结构，同时发挥缓冲区复用的优势
+		data := make([]byte, n)
+		copy(data, buffer[:n])
+		s.DataChan2Client <- common.NewProto(common.CodeSuccess, common.TypeForwarding, cid, data)
+	}
+}
+
+// HandleUserConnUDP 完成 UDP 连接创建和接收数据
+func (s *Server) HandleUserConnUDP(values ...interface{}) {
+	udpConn, _ := values[0].(*wrappers.UDPConn)
+	conn, _ := values[1].(*net.UDPConn)
+	clientAddr, _ := values[2].(*net.UDPAddr)
+	data0, _ := values[3].([]byte)
+
+	if s.ClientConn == nil {
+		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝user：%s的连接，serp-client未连接", conn.RemoteAddr()))
+		return
+	}
+
+	// 初始化 UDPWrapper
+	udpWrapper := &wrappers.UDPWrapper{
+		Conn:           conn,
+		ClientAddr:     clientAddr,
+		ReadC:          make(chan []byte, 100),
+		Sigc:           make(chan struct{}),
+		HandshakeRespC: make(chan common.Proto),
+	}
+
+	// 记录映射
+	udpConn.AddConn(clientAddr, udpWrapper)
+	defer udpConn.DelConn(clientAddr)
+
+	// 写入第一次传输的数据，获取 connection id
+	udpWrapper.ReadC <- data0
+	cid := s.GetNextCID()
+	err := s.SendDataToClient(common.NewProto(common.CodeSuccess, common.TypeNewConn, cid, nil))
+	if err != nil {
+		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝user：%s的连接，无法向srp-client发送数据，%s", clientAddr, err))
+		return
+	}
+
+	// 验证 TypeAcceptConn
+	data := <-udpWrapper.HandshakeRespC
+	if data.Type == common.TypeDisconnect {
+		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("无法建立UDP连接，srp-server：%s", data.Payload))
+		return
+	}
+
+	// 添加新的连接，设置 deadline
+	s.AddUserConn(cid, udpWrapper)
+	udpWrapper.SetDeadline(time.Now().Add(common.UDPTimeOut))
+	logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("建立连接(cid：%d)：%s->srp-server", cid, clientAddr))
+
+	buffer := s.BufferPool.Get().([]byte)
+	defer s.BufferPool.Put(buffer)
 	for {
 		n, err := udpWrapper.Read(buffer)
 		if err != nil {
 			logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("与user：%s的断开连接，%s", clientAddr, err))
 			s.DataChan2Client <- common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte(err.Error()))
-			s.CloseUserConn(cid)
-			udpConn.DelConn(clientAddr)
-			s.BufferPool.Put(buffer)
 			return
 		}
 		data := make([]byte, n)
