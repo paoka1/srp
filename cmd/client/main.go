@@ -73,6 +73,7 @@ func main() {
 	for {
 		if err := data.DecodeProto(reader); err != nil {
 			srpClient.CloseAllServiceConn()
+			srpClient.CloseServerConn()
 			log.Fatal("无法处理srp-server的数据：" + err.Error())
 		}
 

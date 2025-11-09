@@ -157,7 +157,14 @@ func (s *Server) HandleClient(conn net.Conn) {
 			logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("与srp-client：%s的连接断开，%s", conn.RemoteAddr(), err))
 			s.CloseClientConn()
 			s.CloseAllUserConn()
-			return
+			for {
+				select {
+				case <-s.DataChan2Client:
+				case <-s.DataChan2User:
+				default:
+					return
+				}
+			}
 		}
 		if data.Type == common.TypeAcceptConn || data.Type == common.TypeRejectConn {
 			conn := s.GetUserConn(data.CID)

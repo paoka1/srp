@@ -69,6 +69,14 @@ func (c *Client) CloseAllServiceConn() {
 	c.UserConnIDMap = make(map[uint32]net.Conn)
 }
 
+func (c *Client) CloseServerConn() {
+	c.RWMu.Lock()
+	defer c.RWMu.Unlock()
+	if c.ServerConn != nil {
+		c.ServerConn.Close()
+	}
+}
+
 func (c *Client) EstablishServerConn() {
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", c.ServerIP, c.ServerPort))
 	if err != nil {
