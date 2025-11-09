@@ -61,14 +61,12 @@ func main() {
 	default:
 		log.Fatal("不支持的协议：" + srpServer.ServiceProtocol)
 	}
-
 	logger.LogWithLevel(srpServer.LogLevel, 1, fmt.Sprintf("srp-client连接地址：%s:%d", srpServer.ClientIP, srpServer.ClientPort))
 	logger.LogWithLevel(srpServer.LogLevel, 1, fmt.Sprintf("用户访问地址：%s:%d", srpServer.UserIP, srpServer.UserPort))
 
+	go srpServer.AcceptUserConn()
 	go srpServer.AcceptClient()
 	defer srpServer.CloseClientConn()
-
-	go srpServer.AcceptUserConn()
 
 	// 通过 DataChan2Client 接收 user 消息，发送到 srp-client
 	// 通过 DataChan2User 接收 srp-client 消息，根据 cid 发送到 user

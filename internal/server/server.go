@@ -110,10 +110,10 @@ func (s *Server) AcceptClient() {
 
 // HandleClient 完成 srp-client 的认证和处理
 func (s *Server) HandleClient(conn net.Conn) {
-	// 设置期限，开始进行验证
-	conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+	// 初始化，设置期限，开始进行验证
 	data := common.Proto{}
 	reader := bufio.NewReader(conn)
+	conn.SetReadDeadline(time.Now().Add(3 * time.Second))
 	if err := data.DecodeProto(reader); err != nil {
 		conn.Close()
 		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝srp-client：%s的连接，%s", conn.RemoteAddr(), err))
@@ -134,13 +134,13 @@ func (s *Server) HandleClient(conn net.Conn) {
 		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝srp-client：%s的连接，无法处理数据，%s", conn.RemoteAddr(), err))
 		return
 	}
-
 	if _, err = conn.Write(dataByte); err != nil {
 		conn.Close()
 		logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("拒绝srp-client：%s的连接，无法发送数据，%s", conn.RemoteAddr(), err))
 		return
 	}
 
+	// 在连接密码不正确或其他情况时，断开连接
 	if data.Code == common.CodeForbidden {
 		conn.Close()
 		return
@@ -151,7 +151,7 @@ func (s *Server) HandleClient(conn net.Conn) {
 	conn.SetReadDeadline(time.Time{})
 	logger.LogWithLevel(s.LogLevel, 1, fmt.Sprintf("成功建立与srp-client：%s的连接", conn.RemoteAddr()))
 
-	// 接收来自 srp-client 的消息，放到 DataChan2Handle 或 DataChan2User
+	// 接收来自 srp-client 的消息，分类处理
 	for {
 		if err = data.DecodeProto(reader); err != nil {
 			logger.LogWithLevel(s.LogLevel, 2, fmt.Sprintf("与srp-client：%s的连接断开，%s", conn.RemoteAddr(), err))

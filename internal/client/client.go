@@ -81,15 +81,14 @@ func (c *Client) EstablishServerConn() {
 	if err != nil {
 		log.Fatal("与srp-server建立连接失败，无法构造数据：" + err.Error())
 	}
-
 	if _, err = conn.Write(dataByte); err != nil {
+		conn.Close()
 		log.Fatal("与srp-server建立连接失败：" + err.Error())
 	}
 	logger.LogWithLevel(c.LogLevel, 2, "已向srp-server发送验证信息，等待响应")
 
 	// 在 srp-server 在处理连接或已存在连接时，主动退出
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	// 接收响应
 	reader := bufio.NewReader(conn)
 	if err = data.DecodeProto(reader); err != nil {
 		conn.Close()
@@ -133,35 +132,35 @@ func (c *Client) HandleServerDataTCP(data common.Proto) {
 	cid := data.CID
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", c.ServiceIP, c.ServicePort))
 	if err != nil {
-		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf(fmt.Sprintf("拒绝用户连接(cid：%d)，无法和服务建立连接：%s", cid, err)))
-		data = common.NewProto(common.CodeForbidden, common.TypeRejectConn, cid, []byte(err.Error()))
+		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("拒绝用户连接(cid：%d)，无法和服务建立连接：%s", cid, err))
+		dataErr := common.NewProto(common.CodeForbidden, common.TypeRejectConn, cid, []byte(err.Error()))
+		if err := c.SendDataToServer(dataErr); err != nil {
+			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向srp-server发送数据，%s", err))
+		}
+		return
 	} else {
-		data = common.NewProto(common.CodeSuccess, common.TypeAcceptConn, cid, []byte{})
+		dataOk := common.NewProto(common.CodeSuccess, common.TypeAcceptConn, cid, []byte{})
+		if err := c.SendDataToServer(dataOk); err != nil {
+			conn.Close()
+			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向srp-server发送数据，%s", err))
+			return
+		}
 	}
 
-	if err := c.SendDataToServer(data); err != nil {
-		conn.Close()
-		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向srp-server发送数据，%s", err))
-		return
-	}
-
-	if data.Type == common.TypeRejectConn {
-		return
-	}
-
+	// 完成注册
 	(conn.(*net.TCPConn)).SetKeepAlive(true)
 	c.AddUserConn(cid, conn)
+	defer c.CloseUserConn(cid)
 	logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("建立连接(cid：%d)：%s->%s", cid, conn.LocalAddr(), conn.RemoteAddr()))
 
 	buffer := c.BufferPool.Get().([]byte)
+	defer c.BufferPool.Put(buffer)
 	// 阻塞在获取 service 消息处，获得消息后立刻包装发送
 	for {
 		n, err := conn.Read(buffer)
 		if err != nil {
 			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("用户连接(cid：%d)的服务连接断开，%s", cid, err))
 			c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte(err.Error())))
-			c.CloseUserConn(cid)
-			c.BufferPool.Put(buffer)
 			return
 		}
 		// 只传输读取的所有数据，而不是原来的 buffer
@@ -177,14 +176,22 @@ func (c *Client) HandleServerDataUDP(data common.Proto) {
 	cid := data.CID
 	clientAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", c.ServiceIP, c.ServicePort))
 	if err != nil {
-		c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte(err.Error())))
+		dataErr := common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte(err.Error()))
+		if err := c.SendDataToServer(dataErr); err != nil {
+			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向srp-server发送数据，%s", err))
+			return
+		}
 		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向服务发起UDP连接，%s", err))
 		return
 	}
 
 	conn, err := net.DialUDP("udp", nil, clientAddr)
 	if err != nil {
-		c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte(err.Error())))
+		dataErr := common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte(err.Error()))
+		if err := c.SendDataToServer(dataErr); err != nil {
+			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向srp-server发送数据，%s", err))
+			return
+		}
 		logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("无法向服务发起UDP连接，%s", err))
 		return
 	}
@@ -201,15 +208,16 @@ func (c *Client) HandleServerDataUDP(data common.Proto) {
 
 	// 记录映射
 	c.AddUserConn(cid, conn)
+	defer c.CloseUserConn(cid)
 	logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("建立连接(cid：%d)：srp-client->%s", cid, conn.RemoteAddr()))
+
 	buffer := c.BufferPool.Get().([]byte)
+	defer c.BufferPool.Put(buffer)
 	for {
 		n, err := conn.Read(buffer)
 		if err != nil {
 			logger.LogWithLevel(c.LogLevel, 2, fmt.Sprintf("用户连接(cid：%d)的服务连接断开，%s", cid, err))
 			c.SendDataToServer(common.NewProto(common.CodeSuccess, common.TypeDisconnect, cid, []byte(err.Error())))
-			c.CloseUserConn(cid)
-			c.BufferPool.Put(buffer)
 			return
 		}
 		// 只传输读取的所有数据，而不是原来的 buffer
