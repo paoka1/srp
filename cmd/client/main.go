@@ -65,18 +65,17 @@ func main() {
 		}
 	}()
 
-	// 阻塞在接收 srp-server 的消息处
+	// 阻塞在处理 srp-server 的消息处
 	// 1.取出消息，若为新的用户连接，调用则向服务发送数据并处理连接
 	// 2.若为转发的流量，则转发到对应的连接
 	data := common.Proto{}
 	reader := bufio.NewReader(srpClient.ServerConn)
 	for {
 		if err := data.DecodeProto(reader); err != nil {
-			srpClient.CloseAllServiceConn()
 			srpClient.CloseServerConn()
+			srpClient.CloseAllServiceConn()
 			log.Fatal("无法处理srp-server的数据：" + err.Error())
 		}
-
 		switch data.Type {
 		case common.TypeNewConn:
 			go srpClient.HandleServerData(data)
