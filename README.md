@@ -87,7 +87,7 @@ go build -o server cmd/server/main.go
 ./client -server-ip A
 ```
 
-3.访问被转发的SSH服务：
+3.访问被转发的WEB服务：
 
 ```shell
 curl A:9352
