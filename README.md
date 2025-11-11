@@ -3,7 +3,10 @@
 #### 1.简介
 TCP、UDP反向代理（内网穿透）和协议转换工具
 #### 2.用法
-```
+
+srp-server端：
+
+```shell
 Usage of server.exe:
   -client-ip string
         srp-client连接的IP地址 (default "0.0.0.0")
@@ -21,7 +24,11 @@ Usage of server.exe:
         用户访问被转发服务的端口 (default 9352)
   -version
         打印版本信息
-        
+```
+
+srp-client端：
+
+```shell
 Usage of client.exe:
   -log-level int
         日志级别（1-3） (default 2)
@@ -46,33 +53,59 @@ Usage of client.exe:
 
 #### 4.构建
 
-切换目录至`build`运行对应的构建脚本，构建的二进制文件会被输出到根目录的`bin`目录，或者在项目根目录运行：
+切换目录至`build`运行对应的构建脚本，构建的二进制文件会被输出到根目录的`bin`目录
+
+或在项目根目录运行构建命令：
 
 ```shell
 go build -o client cmd/client/main.go
 go build -o server cmd/server/main.go
 ```
 
-#### 5.TCP实例
+#### 5.实例
 
-转发192.168.12.172的ssh服务到192.168.12.1的22端口：
+##### 5.1内网穿透转发WEB服务
 
-1.在192.168.12.1运行srp服务端：
+转发192.168.12.172（内网）的WEB服务到远程服务器（具有公网IP地址A）：
+
+1.在远程服务器运行srp服务端：
 
 ```shell
-server.exe -user-port 22
+./server
 ```
 
 2.在192.168.12.172运行srp客户端：
 
 ```shell
-./client -server-ip 192.168.12.1 -service-port 22
+./client -server-ip A
 ```
 
-3.在192.168.12.1连接192.168.12.172的ssh服务：
+3.访问被转发的SSH服务：
 
 ```shell
-ssh ubuntu@192.168.12.1
+curl A:9352
+```
+
+##### 5.2内网穿透转发SSH服务
+
+转发192.168.12.172（内网）的SSH服务到远程服务器（具有公网IP地址A）：
+
+1.在远程服务器运行srp服务端：
+
+```shell
+./server
+```
+
+2.在192.168.12.172运行srp客户端：
+
+```shell
+./client -server-ip A -service-port 22
+```
+
+3.连接被转发的SSH服务：
+
+```shell
+ssh -p 9352 username@A
 ```
 
 注意：
@@ -80,6 +113,8 @@ ssh ubuntu@192.168.12.1
 1.参数`-user-port`为用户连接的端口，`-client-port`为srp客户端连接的端口
 
 2.参数`-server-port`和`-server-pwd`均与srp服务端有关，`-service-ip`和`-service-port`均和被转发服务有关
+
+3.在srp-server和srp-client指定不同的protocol即可实现协议的转换
 
 #### 6.关于
 

@@ -40,14 +40,14 @@ set GOOS=linux
 set GOARCH=amd64
 
 echo Building client for Linux...
-go build -trimpath -ldflags "%LDFLAGS%" -o "..\bin\client_linux" "..\cmd\client\main.go"
+go build -trimpath -ldflags "%LDFLAGS%" -o "..\bin\client" "..\cmd\client\main.go"
 if !errorlevel! neq 0 (
     echo Failed to build client for Linux
     exit /b 1
 )
 
 echo Building server for Linux...
-go build -trimpath -ldflags "%LDFLAGS%" -o "..\bin\server_linux" "..\cmd\server\main.go"
+go build -trimpath -ldflags "%LDFLAGS%" -o "..\bin\server" "..\cmd\server\main.go"
 if !errorlevel! neq 0 (
     echo Failed to build server for Linux
     exit /b 1
