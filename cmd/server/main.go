@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
 	"srp/internal/common"
 	"srp/internal/server"
 	"srp/pkg/logger"
@@ -24,7 +25,13 @@ func main() {
 	serverPassword := flag.String("server-pwd", common.DefaultServerPasswd, "srp-server连接密码")
 	protocol := flag.String("protocol", "tcp", "用户和srp-server间的通信协议，支持："+utils.Protocols2String(common.Protocols))
 	logLevel := flag.Int("log-level", 2, fmt.Sprintf("日志级别（1-%d）", logger.MaxLogLevel))
+	versionInfo := flag.Bool("version", false, "打印版本信息")
 	flag.Parse()
+
+	logger.LogWithLevel(1, 1, fmt.Sprintf("srp-server，版本：%s", common.Version))
+	if *versionInfo {
+		os.Exit(0)
+	}
 
 	srpServer := server.Server{
 		Config: server.Config{

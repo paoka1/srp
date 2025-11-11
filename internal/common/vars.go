@@ -9,6 +9,8 @@ const (
 )
 
 var (
+	Version = "v1.0.0"
+
 	// Protocols 支持的协议类型
 	Protocols = []string{
 		"tcp",

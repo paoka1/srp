@@ -19,6 +19,8 @@ Usage of server.exe:
         srp-server连接密码 (default "default_password")
   -user-port int
         用户访问被转发服务的端口 (default 9352)
+  -version
+        打印版本信息
         
 Usage of client.exe:
   -log-level int
@@ -35,6 +37,8 @@ Usage of client.exe:
         被转发服务的IP地址 (default "127.0.0.1")
   -service-port int
         被转发服务的端口 (default 80)
+  -version
+        打印版本信息
 ```
 
 #### 3.原理
@@ -42,7 +46,7 @@ Usage of client.exe:
 
 #### 4.构建
 
-切换目录至`build`运行对应的构建脚本，构建的二进制文件会被输出到`bin`目录，或者在项目根目录运行：
+切换目录至`build`运行对应的构建脚本，构建的二进制文件会被输出到根目录的`bin`目录，或者在项目根目录运行：
 
 ```shell
 go build -o client cmd/client/main.go
