@@ -1,8 +1,10 @@
-### SRP（Simple Reverse Proxy 简易反向代理）
+## SRP（Simple Reverse Proxy 简易反向代理）
 
-#### 1.简介
+### 1.简介
+
 TCP、UDP反向代理（内网穿透）和协议转换工具
-#### 2.用法
+
+### 2.用法
 
 srp-server端：
 
@@ -48,10 +50,15 @@ Usage of client.exe:
         打印版本信息
 ```
 
-#### 3.原理
+### 3.原理
+
 `service <---> srp-server <---> srp-client <---> User`
 
-#### 4.构建
+### 4.下载
+
+发布页：[srp releases](https://github.com/paoka1/srp/releases)
+
+### 5.构建
 
 切换目录至`build`运行对应的构建脚本，构建的二进制文件会被输出到根目录的`bin`目录
 
@@ -62,9 +69,9 @@ go build -o client cmd/client/main.go
 go build -o server cmd/server/main.go
 ```
 
-#### 5.实例
+### 6.实例
 
-##### 5.1内网穿透转发WEB服务
+#### 6.1内网穿透转发WEB服务
 
 转发192.168.12.172（内网）的WEB服务到远程服务器（具有公网IP地址A）：
 
@@ -86,7 +93,7 @@ go build -o server cmd/server/main.go
 curl A:9352
 ```
 
-##### 5.2内网穿透转发SSH服务
+#### 6.2内网穿透转发SSH服务
 
 转发192.168.12.172（内网）的SSH服务到远程服务器（具有公网IP地址A）：
 
@@ -116,6 +123,6 @@ ssh -p 9352 username@A
 
 3.在srp-server和srp-client指定不同的protocol即可实现协议的转换
 
-#### 6.关于
+### 7.关于
 
 该项目计划仅支持TCP、UDP协议，后续的更新维护内容主要为性能优化以及BUG修复
