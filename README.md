@@ -123,6 +123,8 @@ ssh -p 9352 username@A
 
 3.在srp-server和srp-client指定不同的protocol即可实现协议的转换
 
+4.必要时修改默认连接密码
+
 ### 7.关于
 
 该项目计划仅支持TCP、UDP协议，后续的更新维护内容主要为性能优化以及BUG修复
