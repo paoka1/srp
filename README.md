@@ -56,7 +56,7 @@ Usage of client.exe:
 
 ### 4.下载
 
-发布页：[srp releases](https://github.com/paoka1/srp/releases)
+发布页：[srp releases](https://github.com/paoka1/srp/releases)，下载的版本可能落后于手动构建的版本
 
 ### 5.构建
 
