@@ -44,7 +44,7 @@ func main() {
 			LogLevel:        *logLevel,
 		},
 		ClientConn:      nil,
-		CIDNext:         1,
+		CIDCounter:      0,
 		UserConnIDMap:   make(map[uint32]net.Conn),
 		DataChan2User:   make(chan common.Proto, 100),
 		DataChan2Client: make(chan common.Proto, 100),

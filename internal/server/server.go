@@ -9,6 +9,7 @@ import (
 	"srp/internal/server/wrappers"
 	"srp/pkg/logger"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -28,7 +29,7 @@ type Config struct {
 type Server struct {
 	Config
 
-	CIDNext       uint32
+	CIDCounter    uint32
 	ClientConn    net.Conn
 	UserConnIDMap map[uint32]net.Conn // map of User Connection ID to Connection
 
@@ -75,11 +76,7 @@ func (s *Server) CloseClientConn() {
 }
 
 func (s *Server) GetNextCID() uint32 {
-	s.RWMu.Lock()
-	defer s.RWMu.Unlock()
-	cid := s.CIDNext
-	s.CIDNext++
-	return cid
+	return atomic.AddUint32(&s.CIDCounter, 1)
 }
 
 func (s *Server) CloseAllUserConn() {
