@@ -52,7 +52,7 @@ Usage of client.exe:
 
 ### 3.原理
 
-`service <---> srp-server <---> srp-client <---> User`
+`service <---> srp-client <---> srp-server <---> user`
 
 ### 4.下载
 
